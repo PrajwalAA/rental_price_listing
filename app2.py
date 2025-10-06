@@ -2,16 +2,6 @@ import streamlit as st
 import json
 import re
 from collections import defaultdict
-import spacy
-from spacy.matcher import Matcher
-
-# Load spaCy model
-try:
-    nlp = spacy.load("en_core_web_sm")
-except:
-    st.warning("Downloading spaCy model... This may take a moment.")
-    spacy.cli.download("en_core_web_sm")
-    nlp = spacy.load("en_core_web_sm")
 
 # --- Load properties from JSON file ---
 @st.cache_data
@@ -239,157 +229,188 @@ def format_property(prop):
         f"**Age:** {age} years | **Area:** {area} | **Zone:** {zone}"
     )
 
-# --- Extract filters from natural language ---
+# --- Extract filters from natural language using regex ---
 def extract_filters_from_text(text):
-    """Extract property search filters from natural language text using spaCy NLP"""
-    doc = nlp(text.lower())
+    """Extract property search filters from natural language text using regex"""
     filters = {}
+    text_lower = text.lower()
     
-    # Initialize matcher
-    matcher = Matcher(nlp.vocab)
+    # Extract rent/price
+    rent_patterns = [
+        r'rent\s+(?:below|under|less\s+than)\s+(\d+)',
+        r'rent\s+(?:above|over|more\s+than)\s+(\d+)',
+        r'rent\s+between\s+(\d+)\s+and\s+(\d+)',
+        r'rent\s+of\s+(\d+)',
+        r'price\s+(?:below|under|less\s+than)\s+(\d+)',
+        r'price\s+(?:above|over|more\s+than)\s+(\d+)',
+        r'price\s+between\s+(\d+)\s+and\s+(\d+)',
+        r'price\s+of\s+(\d+)',
+        r'(?:below|under|less\s+than)\s+(\d+)\s+rent',
+        r'(?:above|over|more\s+than)\s+(\d+)\s+rent',
+        r'between\s+(\d+)\s+and\s+(\d+)\s+rent',
+        r'(\d+)\s+rent'
+    ]
     
-    # Define patterns for different filter types
-    patterns = {
-        "rent": [
-            [{"LOWER": "rent"}, {"LOWER": "below"}, {"LIKE_NUM": True}],
-            [{"LOWER": "rent"}, {"LOWER": "under"}, {"LIKE_NUM": True}],
-            [{"LOWER": "rent"}, {"LOWER": "above"}, {"LIKE_NUM": True}],
-            [{"LOWER": "rent"}, {"LOWER": "over"}, {"LIKE_NUM": True}],
-            [{"LOWER": "rent"}, {"LOWER": "between"}, {"LIKE_NUM": True}, {"LOWER": "and"}, {"LIKE_NUM": True}],
-            [{"LOWER": "rent"}, {"LIKE_NUM": True}],
-            [{"LOWER": "price"}, {"LOWER": "below"}, {"LIKE_NUM": True}],
-            [{"LOWER": "price"}, {"LOWER": "under"}, {"LIKE_NUM": True}],
-            [{"LOWER": "price"}, {"LOWER": "above"}, {"LIKE_NUM": True}],
-            [{"LOWER": "price"}, {"LOWER": "over"}, {"LIKE_NUM": True}],
-            [{"LOWER": "price"}, {"LOWER": "between"}, {"LIKE_NUM": True}, {"LOWER": "and"}, {"LIKE_NUM": True}],
-            [{"LOWER": "price"}, {"LIKE_NUM": True}],
-        ],
-        "bedrooms": [
-            [{"LIKE_NUM": True}, {"LOWER": "bedroom"}],
-            [{"LIKE_NUM": True}, {"LOWER": "bedrooms"}],
-            [{"LIKE_NUM": True}, {"LOWER": "bhk"}],
-        ],
-        "bathrooms": [
-            [{"LIKE_NUM": True}, {"LOWER": "bathroom"}],
-            [{"LIKE_NUM": True}, {"LOWER": "bathrooms"}],
-            [{"LIKE_NUM": True}, {"LOWER": "bath"}],
-        ],
-        "area": [
-            [{"LOWER": "in"}, {"LOWER": {"IN": [a.lower() for a in ALL_AREAS]}}],
-            [{"LOWER": "area"}, {"IS_PUNCT": True, "OP": "?"}, {"LOWER": {"IN": [a.lower() for a in ALL_AREAS]}}],
-        ],
-        "property_type": [
-            [{"LOWER": {"IN": [p.lower() for p in ALL_PROPERTY_TYPES]}}],
-        ],
-        "room_type": [
-            [{"LOWER": {"IN": [r.lower() for r in ALL_ROOM_TYPES]}}],
-        ],
-        "furnishing": [
-            [{"LOWER": "furnished"}],
-            [{"LOWER": "semi"}, {"LOWER": "furnished"}],
-            [{"LOWER": "unfurnished"}],
-        ],
-        "brokerage": [
-            [{"LOWER": "no"}, {"LOWER": "brokerage"}],
-            [{"LOWER": "without"}, {"LOWER": "brokerage"}],
-            [{"LOWER": "zero"}, {"LOWER": "brokerage"}],
-            [{"LOWER": "free"}, {"LOWER": "brokerage"}],
-            [{"LOWER": "with"}, {"LOWER": "brokerage"}],
-        ],
-        "facilities": [
-            [{"LOWER": "with"}, {"LOWER": {"IN": [f.replace("_", " ").lower() for f in ALL_FACILITIES]}}],
-            [{"LOWER": "having"}, {"LOWER": {"IN": [f.replace("_", " ").lower() for f in ALL_FACILITIES]}}],
-        ],
-        "amenities": [
-            [{"LOWER": "amenities"}, {"LOWER": "below"}, {"LIKE_NUM": True}],
-            [{"LOWER": "amenities"}, {"LOWER": "under"}, {"LIKE_NUM": True}],
-            [{"LOWER": "amenities"}, {"LOWER": "above"}, {"LIKE_NUM": True}],
-            [{"LOWER": "amenities"}, {"LOWER": "over"}, {"LIKE_NUM": True}],
-            [{"LOWER": "amenities"}, {"LOWER": "between"}, {"LIKE_NUM": True}, {"LOWER": "and"}, {"LIKE_NUM": True}],
-            [{"LOWER": "amenities"}, {"LIKE_NUM": True}],
-        ],
-        "size": [
-            [{"LOWER": "size"}, {"LOWER": "below"}, {"LIKE_NUM": True}],
-            [{"LOWER": "size"}, {"LOWER": "under"}, {"LIKE_NUM": True}],
-            [{"LOWER": "size"}, {"LOWER": "above"}, {"LIKE_NUM": True}],
-            [{"LOWER": "size"}, {"LOWER": "over"}, {"LIKE_NUM": True}],
-            [{"LOWER": "size"}, {"LOWER": "between"}, {"LIKE_NUM": True}, {"LOWER": "and"}, {"LIKE_NUM": True}],
-            [{"LOWER": "size"}, {"LIKE_NUM": True}],
-        ],
-        "age": [
-            [{"LOWER": "age"}, {"LOWER": "below"}, {"LIKE_NUM": True}],
-            [{"LOWER": "age"}, {"LOWER": "under"}, {"LIKE_NUM": True}],
-            [{"LOWER": "age"}, {"LOWER": "above"}, {"LIKE_NUM": True}],
-            [{"LOWER": "age"}, {"LOWER": "over"}, {"LIKE_NUM": True}],
-            [{"LOWER": "age"}, {"LOWER": "between"}, {"LIKE_NUM": True}, {"LOWER": "and"}, {"LIKE_NUM": True}],
-            [{"LOWER": "age"}, {"LIKE_NUM": True}],
-        ],
-    }
-    
-    # Add patterns to matcher
-    for filter_type, pattern_list in patterns.items():
-        for i, pattern in enumerate(pattern_list):
-            matcher.add(f"{filter_type}_{i}", [pattern])
-    
-    # Find matches
-    matches = matcher(doc)
-    
-    # Process matches
-    for match_id, start, end in matches:
-        string_id = nlp.vocab.strings[match_id]
-        filter_type = string_id.split('_')[0]
-        span = doc[start:end]
-        
-        if filter_type == "rent" or filter_type == "price" or filter_type == "amenities" or filter_type == "size" or filter_type == "age":
-            # Handle numeric conditions
-            if "below" in span.text or "under" in span.text:
-                num = [token for token in span if token.like_num][0]
-                filters[filter_type] = f"below {num.text}"
-            elif "above" in span.text or "over" in span.text:
-                num = [token for token in span if token.like_num][0]
-                filters[filter_type] = f"above {num.text}"
-            elif "between" in span.text:
-                nums = [token for token in span if token.like_num]
-                filters[filter_type] = f"between {nums[0].text} and {nums[1].text}"
+    for pattern in rent_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            if "between" in pattern:
+                filters["rent"] = f"between {match.group(1)} and {match.group(2)}"
+            elif "below" in pattern or "under" in pattern or "less" in pattern:
+                filters["rent"] = f"below {match.group(1)}"
+            elif "above" in pattern or "over" in pattern or "more" in pattern:
+                filters["rent"] = f"above {match.group(1)}"
             else:
-                num = [token for token in span if token.like_num][0]
-                filters[filter_type] = num.text
-        elif filter_type == "bedrooms" or filter_type == "bathrooms":
-            # Extract number
-            num = [token for token in span if token.like_num][0]
-            filters[filter_type] = num.text
-        elif filter_type == "area":
-            # Extract area name
-            for token in span:
-                if token.text.lower() in [a.lower() for a in ALL_AREAS]:
-                    filters[filter_type] = token.text
-                    break
-        elif filter_type == "property_type" or filter_type == "room_type":
-            # Extract property type or room type
-            filters[filter_type] = span.text
-        elif filter_type == "furnishing":
-            # Extract furnishing status
-            filters[filter_type] = span.text
-        elif filter_type == "brokerage":
-            # Extract brokerage preference
-            if "no" in span.text or "without" in span.text or "zero" in span.text or "free" in span.text:
-                filters[filter_type] = "no"
+                filters["rent"] = match.group(1)
+            break
+    
+    # Extract bedrooms
+    bedroom_patterns = [
+        r'(\d+)\s+bedroom',
+        r'(\d+)\s+bedrooms',
+        r'(\d+)\s+bhk',
+        r'(\d+)\s+rk'
+    ]
+    
+    for pattern in bedroom_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            filters["bedrooms"] = match.group(1)
+            break
+    
+    # Extract bathrooms
+    bathroom_patterns = [
+        r'(\d+)\s+bathroom',
+        r'(\d+)\s+bathrooms',
+        r'(\d+)\s+bath'
+    ]
+    
+    for pattern in bathroom_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            filters["bathrooms"] = match.group(1)
+            break
+    
+    # Extract area
+    for area in ALL_AREAS:
+        if area.lower() in text_lower:
+            filters["area"] = area
+            break
+    
+    # Extract property type
+    for prop_type in ALL_PROPERTY_TYPES:
+        if prop_type.lower() in text_lower:
+            filters["property_type"] = prop_type
+            break
+    
+    # Extract room type
+    for room_type in ALL_ROOM_TYPES:
+        if room_type.lower() in text_lower:
+            filters["room_type"] = room_type
+            break
+    
+    # Extract furnishing
+    if "furnished" in text_lower:
+        if "semi" in text_lower and "furnished" in text_lower:
+            filters["furnishing"] = "semi furnished"
+        elif "unfurnished" in text_lower:
+            filters["furnishing"] = "unfurnished"
+        else:
+            filters["furnishing"] = "furnished"
+    
+    # Extract brokerage
+    if any(phrase in text_lower for phrase in ["no brokerage", "without brokerage", "zero brokerage", "free brokerage"]):
+        filters["brokerage"] = "no"
+    elif "with brokerage" in text_lower or "brokerage" in text_lower:
+        filters["brokerage"] = "yes"
+    
+    # Extract facilities
+    facilities_found = []
+    for facility in ALL_FACILITIES:
+        facility_name = facility.replace("_", " ").lower()
+        if facility_name in text_lower:
+            facilities_found.append(facility)
+    
+    if facilities_found:
+        filters["facilities"] = ", ".join(facilities_found)
+    
+    # Extract amenities count
+    amenities_patterns = [
+        r'amenities\s+(?:below|under|less\s+than)\s+(\d+)',
+        r'amenities\s+(?:above|over|more\s+than)\s+(\d+)',
+        r'amenities\s+between\s+(\d+)\s+and\s+(\d+)',
+        r'amenities\s+of\s+(\d+)',
+        r'(?:below|under|less\s+than)\s+(\d+)\s+amenities',
+        r'(?:above|over|more\s+than)\s+(\d+)\s+amenities',
+        r'between\s+(\d+)\s+and\s+(\d+)\s+amenities',
+        r'(\d+)\s+amenities'
+    ]
+    
+    for pattern in amenities_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            if "between" in pattern:
+                filters["amenities"] = f"between {match.group(1)} and {match.group(2)}"
+            elif "below" in pattern or "under" in pattern or "less" in pattern:
+                filters["amenities"] = f"below {match.group(1)}"
+            elif "above" in pattern or "over" in pattern or "more" in pattern:
+                filters["amenities"] = f"above {match.group(1)}"
             else:
-                filters[filter_type] = "yes"
-        elif filter_type == "facilities":
-            # Extract facilities
-            facility = [token.text for token in span if token.text.lower() in [f.replace("_", " ").lower() for f in ALL_FACILITIES]]
-            if facility:
-                if "facilities" not in filters:
-                    filters["facilities"] = []
-                filters["facilities"].append(facility[0])
+                filters["amenities"] = match.group(1)
+            break
     
-    # Convert facilities list to comma-separated string
-    if "facilities" in filters and isinstance(filters["facilities"], list):
-        filters["facilities"] = ", ".join(filters["facilities"])
+    # Extract size
+    size_patterns = [
+        r'size\s+(?:below|under|less\s+than)\s+(\d+)',
+        r'size\s+(?:above|over|more\s+than)\s+(\d+)',
+        r'size\s+between\s+(\d+)\s+and\s+(\d+)',
+        r'size\s+of\s+(\d+)\s*sqft',
+        r'(?:below|under|less\s+than)\s+(\d+)\s*sqft',
+        r'(?:above|over|more\s+than)\s+(\d+)\s*sqft',
+        r'between\s+(\d+)\s+and\s+(\d+)\s*sqft',
+        r'(\d+)\s*sqft'
+    ]
     
-    # Extract property ID if mentioned
-    id_match = re.search(r'id[:\s]+(\d+)', text.lower())
+    for pattern in size_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            if "between" in pattern:
+                filters["size"] = f"between {match.group(1)} and {match.group(2)}"
+            elif "below" in pattern or "under" in pattern or "less" in pattern:
+                filters["size"] = f"below {match.group(1)}"
+            elif "above" in pattern or "over" in pattern or "more" in pattern:
+                filters["size"] = f"above {match.group(1)}"
+            else:
+                filters["size"] = match.group(1)
+            break
+    
+    # Extract age
+    age_patterns = [
+        r'age\s+(?:below|under|less\s+than)\s+(\d+)',
+        r'age\s+(?:above|over|more\s+than)\s+(\d+)',
+        r'age\s+between\s+(\d+)\s+and\s+(\d+)',
+        r'age\s+of\s+(\d+)\s*years?',
+        r'(?:below|under|less\s+than)\s+(\d+)\s*years?',
+        r'(?:above|over|more\s+than)\s+(\d+)\s*years?',
+        r'between\s+(\d+)\s+and\s+(\d+)\s*years?',
+        r'(\d+)\s*years?'
+    ]
+    
+    for pattern in age_patterns:
+        match = re.search(pattern, text_lower)
+        if match:
+            if "between" in pattern:
+                filters["age"] = f"between {match.group(1)} and {match.group(2)}"
+            elif "below" in pattern or "under" in pattern or "less" in pattern:
+                filters["age"] = f"below {match.group(1)}"
+            elif "above" in pattern or "over" in pattern or "more" in pattern:
+                filters["age"] = f"above {match.group(1)}"
+            else:
+                filters["age"] = match.group(1)
+            break
+    
+    # Extract property ID
+    id_match = re.search(r'id\s*[:\s]*(\d+)', text_lower)
     if id_match:
         filters["id"] = id_match.group(1)
     
