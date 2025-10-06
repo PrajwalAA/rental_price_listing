@@ -230,29 +230,109 @@ def format_property(prop):
     )
 
 # --- Streamlit App ---
-st.set_page_config(page_title="Property Search", layout="wide")
-st.title("🏠 Property Search")
+st.set_page_config(page_title="Property Search Chatbot", layout="wide")
+st.title("🏠 Property Search Chatbot")
 
-# Initialize session state for filters
-if 'filters' not in st.session_state:
-    st.session_state.filters = {}
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-# Search field mapping
-search_map = {
-    "1": "size", "2": "carpet", "3": "age", "4": "brokerage", "5": "id", "6": "amenities", "7": "furnishing",
-    "8": "security", "9": "rent", "10": "area", "11": "zone", "12": "bedrooms", "13": "bathrooms",
-    "14": "balcony", "15": "floor_no", "16": "total_floors", "17": "maintenance", "18": "recommended_for",
-    "19": "water_supply", "20": "society_type", "21": "road_connectivity", "22": "facilities", "23": "nearby_amenities",
-    "24": "room_type", "25": "property_type"
-}
+# Display chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
 
-# Sidebar for filters
-with st.sidebar:
-    st.header("Search Filters")
+# Chat input
+if prompt := st.chat_input("Enter your search query (e.g., '9+10: below 20000, andheri' or '5: 12345' for property ID)"):
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": prompt})
     
-    # Display filter options
+    # Process the query
+    try:
+        # Check for exit command
+        if prompt.lower() == "exit":
+            response = "Goodbye!"
+            st.session_state.messages.append({"role": "assistant", "content": response})
+            st.rerun()
+        
+        # Check for property ID search
+        if prompt.lower().startswith("id:") or prompt.lower().startswith("5:"):
+            prop_id = prompt.split(":")[1].strip()
+            prop = next((p for p in properties_data if str(p.get("property_id")) == prop_id), None)
+            if prop:
+                response = "✅ Property Found:\n\n" + format_property(prop)
+            else:
+                response = "❌ Property not found."
+        else:
+            # Parse field numbers and values
+            parts = [part.strip() for part in prompt.split(',')]
+            combined_filters = {}
+            
+            for part in parts:
+                if ':' in part:
+                    field_part, value = part.split(':', 1)
+                    field_part = field_part.strip()
+                    value = value.strip()
+                    
+                    # Parse field numbers (e.g., "9+10")
+                    field_numbers = field_part.split('+')
+                    selected_fields = []
+                    
+                    # Map field numbers to field names
+                    search_map = {
+                        "1": "size", "2": "carpet", "3": "age", "4": "brokerage", "5": "id", "6": "amenities", "7": "furnishing",
+                        "8": "security", "9": "rent", "10": "area", "11": "zone", "12": "bedrooms", "13": "bathrooms",
+                        "14": "balcony", "15": "floor_no", "16": "total_floors", "17": "maintenance", "18": "recommended_for",
+                        "19": "water_supply", "20": "society_type", "21": "road_connectivity", "22": "facilities", "23": "nearby_amenities",
+                        "24": "room_type", "25": "property_type"
+                    }
+                    
+                    for num in field_numbers:
+                        num = num.strip()
+                        if num in search_map:
+                            selected_fields.append(search_map[num])
+                    
+                    # For each selected field, add the filter
+                    for field in selected_fields:
+                        combined_filters[field] = value
+            
+            # Apply filters
+            results = properties_data
+            for field, value in combined_filters.items():
+                results = filter_properties(value, field, results)
+            
+            # Format response
+            if not results:
+                response = "❌ No properties found matching your search."
+            else:
+                response = f"✅ Found {len(results)} properties matching your search.\n\n"
+                
+                # Group results by property type
+                grouped_results = defaultdict(list)
+                for prop in results:
+                    property_type = prop.get("Room_Details", {}).get("Type", "Other/Unspecified Type")
+                    grouped_results[property_type].append(prop)
+                
+                # Format each property type group
+                for prop_type, props in grouped_results.items():
+                    response += f"--- 🏠 Property Type: {str(prop_type).title()} ({len(props)} results) ---\n\n"
+                    for prop in props:
+                        response += format_property(prop) + "\n\n----------------------------------------\n\n"
+        
+        # Add assistant response to chat history
+        st.session_state.messages.append({"role": "assistant", "content": response})
+        
+    except Exception as e:
+        response = f"❌ Error processing your request: {str(e)}"
+        st.session_state.messages.append({"role": "assistant", "content": response})
+    
+    # Rerun to display the new messages
+    st.rerun()
+
+# Display help information
+with st.expander("💡 Search Options & Help"):
     st.markdown("""
-    **Search Options:**
+    **Search Fields:**
     1. Size (sqft)
     2. Carpet Area (sqft)
     3. Age of Property
@@ -278,84 +358,14 @@ with st.sidebar:
     23. Nearby Amenities
     24. Room Type (e.g., 1 BHK)
     25. Property Type (e.g., Flat)
+    
+    **Search Examples:**
+    - `9+10: below 20000, andheri` (Rent below 20000 in Andheri)
+    - `5: 12345` (Property ID 12345)
+    - `1+2: between 500 and 1000` (Size between 500-1000 sqft)
+    - `4: no, 7: furnished` (No brokerage, furnished property)
+    - `22: gym,swimming pool` (Properties with gym and swimming pool)
+    
+    **Commands:**
+    - `exit` - Exit the chatbot
     """)
-    
-    # Input for filter selection
-    field_numbers = st.text_input("Enter filter numbers (e.g., 9+10):")
-    
-    # Apply filters button
-    apply_filters = st.button("Apply Filters")
-    
-    # Clear filters button
-    if st.button("Clear All Filters"):
-        st.session_state.filters = {}
-        st.experimental_rerun()
-
-# Main content area
-if apply_filters and field_numbers:
-    # Process selected fields
-    selected_fields = []
-    is_valid_input = True
-    
-    for num in field_numbers.split('+'):
-        num = num.strip()
-        if num in search_map:
-            selected_fields.append(search_map[num])
-        else:
-            st.error(f"Invalid field number: '{num}'. Please use a valid number from the list.")
-            is_valid_input = False
-            break
-    
-    if is_valid_input and selected_fields:
-        # Get filter values
-        for field in selected_fields:
-            if field in CATEGORY_OPTIONS and CATEGORY_OPTIONS[field]:
-                options = CATEGORY_OPTIONS[field]
-                st.write(f"### {field.replace('_', ' ').title()}")
-                
-                # Display options
-                col1, col2 = st.columns(2)
-                with col1:
-                    choice = st.radio("Select option:", options, key=f"{field}_radio")
-                with col2:
-                    custom = st.text_input("Or enter custom value:", key=f"{field}_custom")
-                
-                # Use custom value if provided
-                user_input = custom if custom else choice
-                st.session_state.filters[field] = user_input
-            else:
-                user_input = st.text_input(f"Enter {field.replace('_', ' ').title()} value:", key=f"{field}_input")
-                st.session_state.filters[field] = user_input
-
-# Apply filters and display results
-if st.session_state.filters:
-    results = properties_data
-    
-    # Apply each filter
-    for field, value in st.session_state.filters.items():
-        if value:  # Only apply if value is not empty
-            results = filter_properties(value, field, results)
-    
-    # Display results
-    if not results:
-        st.warning("No properties found matching your filters.")
-    else:
-        st.success(f"Found {len(results)} properties matching your filters.")
-        
-        # Group results by property type
-        grouped_results = defaultdict(list)
-        for prop in results:
-            property_type = prop.get("Room_Details", {}).get("Type", "Other/Unspecified Type")
-            grouped_results[property_type].append(prop)
-        
-        # Display each property type group
-        for prop_type, props in grouped_results.items():
-            st.subheader(f"🏠 Property Type: {str(prop_type).title()} ({len(props)} results)")
-            
-            # Display each property in an expandable section
-            for prop in props:
-                with st.expander(f"Property ID: {prop.get('property_id')} - Rent: ₹{prop.get('Rent_Price')}"):
-                    st.markdown(format_property(prop))
-                    st.divider()
-else:
-    st.info("Select filters in the sidebar and click 'Apply Filters' to search for properties.")
