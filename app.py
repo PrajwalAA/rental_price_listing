@@ -4,6 +4,11 @@ import re
 from collections import defaultdict
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
+import folium
+from streamlit_folium import folium_static
+import requests
+import time
 
 # Set page configuration
 st.set_page_config(
@@ -28,6 +33,29 @@ def load_properties():
 
 properties_data = load_properties()
 
+# --- Geocoding function to get coordinates from area name ---
+@st.cache_data
+def geocode_area(area_name):
+    """
+    Get latitude and longitude for an area name using Nominatim API.
+    Returns a tuple (lat, lng) or None if not found.
+    """
+    try:
+        # Using Nominatim API for geocoding (free and no API key required)
+        url = f"https://nominatim.openstreetmap.org/search?q={area_name}&format=json&limit=1"
+        headers = {
+            "User-Agent": "PropertySearchApp/1.0"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"])
+        return None
+    except Exception as e:
+        st.warning(f"Geocoding error for {area_name}: {str(e)}")
+        return None
+
 # --- Helper functions for normalization ---
 def normalize_area_name(area_name):
     return str(area_name).replace(" ", "").lower().strip()
@@ -48,7 +76,8 @@ def normalize_property_type_name(prop_type):
     return str(prop_type).lower().strip()
 
 def get_numeric_value(value):
-    """Extract integer from strings like '800 sqft', '10 years', etc."""
+    """Extract integer from strings like '800 sqft', '10 years', etc.
+       Returns None if no number is found."""
     if not value:
         return None
     match = re.search(r"\d+", str(value))
@@ -63,13 +92,17 @@ ALL_ZONES = sorted(
     list(set(normalize_zone_name(p.get("Zone", "N/A")) for p in properties_data))
 )
 
-ALL_FACILITIES = sorted(
-    {k for p in properties_data for k in p.get("Facilities", {}).keys()}
-)
+ALL_FACILITIES = []
+for p in properties_data:
+    if "Facilities" in p and isinstance(p["Facilities"], dict):
+        ALL_FACILITIES = sorted(list(p["Facilities"].keys()))
+        break
 
-ALL_NEARBY_AMENITIES = sorted(
-    {k for p in properties_data for k in p.get("Nearby_Amenities", {}).keys()}
-)
+ALL_NEARBY_AMENITIES = []
+for p in properties_data:
+    if "Nearby_Amenities" in p and isinstance(p["Nearby_Amenities"], dict):
+        ALL_NEARBY_AMENITIES = sorted(list(p["Nearby_Amenities"].keys()))
+        break
 
 ALL_ROOM_TYPES = sorted(
     list(set(normalize_room_name(p.get("Room_Details", {}).get("Rooms", "N/A"))
@@ -83,12 +116,16 @@ ALL_PROPERTY_TYPES = sorted(
 
 # --- Comparison Function ---
 def compare_properties_side_by_side(data, property_ids):
-    selected = [p for p in data if str(p.get("Property_ID", "")).lower() in property_ids]
+    """
+    Compare multiple properties side by side in table format.
+    """
+    selected = [p for p in data if str(p.get("property_id", "")).lower() in property_ids]
 
     if not selected:
         st.warning("⚠️ No properties found for the given IDs.")
         return
 
+    # Collect all possible comparison keys
     comparison_keys = set()
     for p in selected:
         comparison_keys.update(p.keys())
@@ -96,13 +133,16 @@ def compare_properties_side_by_side(data, property_ids):
             comparison_keys.update([f"Facility: {k}" for k in p["Facilities"].keys()])
         if isinstance(p.get("Nearby_Amenities"), dict):
             comparison_keys.update([f"Amenity: {k}" for k in p["Nearby_Amenities"].keys()])
+        # Also include nested Room_Details keys
         if isinstance(p.get("Room_Details"), dict):
             comparison_keys.update([f"Room Details: {k}" for k in p["Room_Details"].keys()])
 
-    display_order = ["Property_ID", "Rent_Price"]
+    # Always show Property ID and Rent Price first for property comparison
+    display_order = ["property_id", "Rent_Price"]
     remaining_keys = sorted(k for k in comparison_keys if k not in display_order)
     comparison_keys = display_order + remaining_keys
 
+    # Build rows
     rows = []
     for key in comparison_keys:
         row = [key.replace('_', ' ').title()]
@@ -120,17 +160,20 @@ def compare_properties_side_by_side(data, property_ids):
             else:
                 value = p.get(key, "N/A")
 
+            # Format some values
             if key in ["Rent_Price", "Security_Deposite"]:
                 value = f"₹{value}" if value != "N/A" else value
             elif key in ["Size_In_Sqft", "Carpet_Area_Sqft"]:
                 value = f"{value} sqft" if value != "N/A" else value
             elif key == "Brokerage":
-                value = "Yes" if str(value).lower() == "yes" else "No"
+                value = "Yes" if value == "yes" else "No"
 
             row.append(value)
         rows.append(row)
 
-    headers = ["Attribute"] + [f"ID {p.get('Property_ID', 'N/A')}" for p in selected]
+    headers = ["Attribute"] + [f"ID {p.get('property_id', 'N/A')}" for p in selected]
+    
+    # Create a DataFrame for better display
     df = pd.DataFrame(rows, columns=headers)
     st.dataframe(df.style.set_properties(**{'text-align': 'left'}), use_container_width=True)
 
@@ -138,11 +181,10 @@ def compare_properties_side_by_side(data, property_ids):
 def filter_properties(user_input, field, data):
     filtered_properties = []
     data_field_map = {
-        "size": "Size_In_Sqft", "carpet": "Carpet_Area_Sqft", "age": "Property_Age",
-        "brokerage": "Brokerage", "furnishing": "Furnishing_Status", "amenities": "Number_Of_Amenities",
-        "security": "Security_Deposite", "rent": "Rent_Price", "area": "Area", "zone": "Zone",
-        "bedrooms": "Bedrooms", "bathrooms": "Bathrooms", "balcony": "Balcony", "floor_no": "Floor_No",
-        "total_floors": "Total_floors_In_Building", "maintenance": "Maintenance_Charge",
+        "size": "Size_In_Sqft", "carpet": "Carpet_Area_Sqft", "age": "Property_Age", "brokerage": "Brokerage",
+        "furnishing": "Furnishing_Status", "amenities": "Number_Of_Amenities", "security": "Security_Deposite", "rent": "Rent_Price",
+        "area": "Area", "zone": "Zone", "bedrooms": "Bedrooms", "bathrooms": "Bathrooms", "balcony": "Balcony",
+        "floor_no": "Floor_No", "total_floors": "Total_floors_In_Building", "maintenance": "Maintenance_Charge",
         "recommended_for": "Recommended_For", "water_supply": "Water_Supply_Type", "society_type": "Society_Type",
         "road_connectivity": "Road_Connectivity", "facilities": "Facilities", "nearby_amenities": "Nearby_Amenities",
         "room_type": "Room_Details", "property_type": "Room_Details", "id": "Property_ID"
@@ -152,22 +194,21 @@ def filter_properties(user_input, field, data):
         return []
 
     normalized_user_input = user_input.lower().strip()
-
     if field in ["brokerage", "furnishing", "maintenance", "recommended_for", "water_supply", "society_type"]:
         filtered_properties = [p for p in data if str(p.get(data_field, "N/A")).lower() == normalized_user_input]
-
+    
     elif field == "facilities":
         user_facilities = [normalize_facility_name(f) for f in user_input.split(',')]
         filtered_properties = [p for p in data if all(
             normalize_facility_name(k) in user_facilities and v == 1
-            for k, v in p.get("Facilities", {}).items()
+            for k, v in p.get("Facilities", {}).items() if k
         )]
 
     elif field == "nearby_amenities":
         user_amenities = [normalize_amenity_name(f) for f in user_input.split(',')]
         filtered_properties = [p for p in data if all(
             normalize_amenity_name(k) in user_amenities and v == 1
-            for k, v in p.get("Nearby_Amenities", {}).items()
+            for k, v in p.get("Nearby_Amenities", {}).items() if k
         )]
 
     elif field == "room_type":
@@ -181,25 +222,41 @@ def filter_properties(user_input, field, data):
 
     elif field == "zone":
         filtered_properties = [p for p in data if normalize_zone_name(p.get("Zone", "N/A")) == normalize_zone_name(user_input)]
-
+        
     elif field == "id":
         property_ids = [pid.strip().lower() for pid in user_input.split(",")]
         filtered_properties = [p for p in data if str(p.get("Property_ID", "")).lower() in property_ids]
-
+    
     else:
         try:
             val = get_numeric_value(user_input)
+            
             if user_input.startswith("below"):
-                filtered_properties = [p for p in data if get_numeric_value(p.get(data_field)) and get_numeric_value(p.get(data_field)) < val]
+                filtered_properties = [
+                    p for p in data
+                    if get_numeric_value(p.get(data_field)) is not None
+                    and get_numeric_value(p.get(data_field)) < val
+                ]
             elif user_input.startswith("above"):
-                filtered_properties = [p for p in data if get_numeric_value(p.get(data_field)) and get_numeric_value(p.get(data_field)) > val]
+                filtered_properties = [
+                    p for p in data
+                    if get_numeric_value(p.get(data_field)) is not None
+                    and get_numeric_value(p.get(data_field)) > val
+                ]
             elif user_input.startswith("between"):
                 nums = re.findall(r"\d+", user_input)
                 if len(nums) == 2:
                     low, high = int(nums[0]), int(nums[1])
-                    filtered_properties = [p for p in data if get_numeric_value(p.get(data_field)) and low <= get_numeric_value(p.get(data_field)) <= high]
+                    filtered_properties = [
+                        p for p in data
+                        if get_numeric_value(p.get(data_field)) is not None
+                        and low <= get_numeric_value(p.get(data_field)) <= high
+                    ]
             else:
-                filtered_properties = [p for p in data if get_numeric_value(p.get(data_field)) == val]
+                filtered_properties = [
+                    p for p in data
+                    if get_numeric_value(p.get(data_field)) == val
+                ]
         except Exception:
             return []
 
@@ -207,7 +264,7 @@ def filter_properties(user_input, field, data):
 
 # --- Format results ---
 def format_property(prop):
-    property_id = prop.get('Property_ID', 'N/A')
+    property_id = prop.get('property_id', 'N/A')
     rent_price = prop.get('Rent_Price', 'N/A')
     size = prop.get('Size_In_Sqft', 'Unknown')
     carpet_area = prop.get('Carpet_Area_Sqft', 'Unknown')
@@ -247,17 +304,91 @@ def format_property(prop):
         f"**Age:** {age} years | **Area:** {area} | **Zone:** {zone}"
     )
 
+# --- Create property map ---
+def create_property_map(properties):
+    """
+    Create a Folium map with property markers.
+    """
+    # Default to Mumbai coordinates if no properties or location data
+    default_lat, default_lon = 19.0760, 72.8777  # Mumbai coordinates
+    
+    # Create a map centered around the first property or default location
+    if properties and len(properties) > 0:
+        first_prop = properties[0]
+        area = first_prop.get("Area", "Mumbai")
+        coords = geocode_area(area)
+        if coords:
+            start_lat, start_lon = coords
+        else:
+            start_lat, start_lon = default_lat, default_lon
+    else:
+        start_lat, start_lon = default_lat, default_lon
+    
+    # Create the map
+    m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
+    
+    # Add tile layer with Google Maps style
+    folium.TileLayer('OpenStreetMap').add_to(m)
+    
+    # Add property markers
+    for prop in properties:
+        property_id = prop.get('property_id', 'N/A')
+        rent_price = prop.get('Rent_Price', 'N/A')
+        area = prop.get('Area', 'N/A')
+        size = prop.get('Size_In_Sqft', 'Unknown')
+        property_type = prop.get("Room_Details", {}).get("Type", "N/A")
+        
+        # Get coordinates for the property
+        if "Latitude" in prop and "Longitude" in prop:
+            lat, lon = prop["Latitude"], prop["Longitude"]
+        else:
+            # Try to geocode the area name
+            coords = geocode_area(area)
+            if coords:
+                lat, lon = coords
+            else:
+                # Skip if we can't get coordinates
+                continue
+        
+        # Create popup text
+        popup_text = f"""
+        <b>ID:</b> {property_id}<br>
+        <b>Rent:</b> ₹{rent_price}<br>
+        <b>Area:</b> {area}<br>
+        <b>Size:</b> {size} sqft<br>
+        <b>Type:</b> {property_type}
+        """
+        
+        # Add marker to the map
+        folium.Marker(
+            location=[lat, lon],
+            popup=folium.Popup(popup_text, max_width=250),
+            tooltip=f"ID: {property_id} | Rent: ₹{rent_price}",
+            icon=folium.Icon(color='blue', icon='home')
+        ).add_to(m)
+    
+    return m
+
 # --- Main App ---
 def main():
+    # Header
     st.title("🏠 Property Search Assistant")
     st.markdown("Find your perfect property with our advanced search and comparison tools")
     
+    # Initialize session state for filters
     if 'filters' not in st.session_state:
         st.session_state.filters = {}
     
+    # Sidebar for filters
     st.sidebar.header("🔍 Search Filters")
-    search_mode = st.sidebar.radio("Select Search Mode", ["Simple Search", "Advanced Search", "Compare Properties"])
     
+    # Search mode selection
+    search_mode = st.sidebar.radio(
+        "Select Search Mode",
+        ["Simple Search", "Advanced Search", "Compare Properties"]
+    )
+    
+    # Category options for dropdowns
     CATEGORY_OPTIONS = {
         "brokerage": sorted(list(set(str(p.get("Brokerage", "N/A")).lower() for p in properties_data))),
         "furnishing": sorted(list(set(str(p.get("Furnishing_Status", "N/A")).lower() for p in properties_data))),
@@ -270,13 +401,32 @@ def main():
         "room_type": ALL_ROOM_TYPES,
         "property_type": ALL_PROPERTY_TYPES
     }
-
-    # Simple Search
+    
+    # Search map
+    search_map = {
+        "1": "size", "2": "carpet", "3": "age", "4": "brokerage", "5": "id", "6": "amenities", "7": "furnishing",
+        "8": "security", "9": "rent", "10": "area", "11": "zone", "12": "bedrooms", "13": "bathrooms",
+        "14": "balcony", "15": "floor_no", "16": "total_floors", "17": "maintenance", "18": "recommended_for",
+        "19": "water_supply", "20": "society_type", "21": "road_connectivity", "22": "facilities", "23": "nearby_amenities",
+        "24": "room_type", "25": "property_type", "26": "compare"
+    }
+    
+    # Simple Search Mode
     if search_mode == "Simple Search":
         st.sidebar.subheader("Quick Search")
-        quick_search = st.sidebar.selectbox("Select search criteria", ["Rent Price", "Area", "Property Type", "Bedrooms"])
+        
+        # Quick search options
+        quick_search = st.sidebar.selectbox(
+            "Select search criteria",
+            ["Rent Price", "Area", "Property Type", "Bedrooms"]
+        )
+        
         if quick_search == "Rent Price":
-            rent_option = st.sidebar.radio("Rent preference", ["Below budget", "Above budget", "Exact amount", "Range"])
+            rent_option = st.sidebar.radio(
+                "Rent preference",
+                ["Below budget", "Above budget", "Exact amount", "Range"]
+            )
+            
             if rent_option == "Below budget":
                 max_rent = st.sidebar.number_input("Maximum rent (₹)", min_value=1000, value=20000, step=1000)
                 st.session_state.filters["rent"] = f"below {max_rent}"
@@ -286,49 +436,225 @@ def main():
             elif rent_option == "Exact amount":
                 exact_rent = st.sidebar.number_input("Exact rent (₹)", min_value=1000, value=15000, step=1000)
                 st.session_state.filters["rent"] = str(exact_rent)
-            else:
+            else:  # Range
                 col1, col2 = st.sidebar.columns(2)
-                with col1: min_rent = st.number_input("Min rent (₹)", min_value=1000, value=10000, step=1000)
-                with col2: max_rent = st.number_input("Max rent (₹)", min_value=1000, value=25000, step=1000)
+                with col1:
+                    min_rent = st.number_input("Min rent (₹)", min_value=1000, value=10000, step=1000)
+                with col2:
+                    max_rent = st.number_input("Max rent (₹)", min_value=1000, value=25000, step=1000)
                 st.session_state.filters["rent"] = f"between {min_rent} and {max_rent}"
+                
         elif quick_search == "Area":
             area = st.sidebar.selectbox("Select area", ALL_AREAS)
             st.session_state.filters["area"] = area
+            
         elif quick_search == "Property Type":
             prop_type = st.sidebar.selectbox("Select property type", ALL_PROPERTY_TYPES)
             st.session_state.filters["property_type"] = prop_type
+            
         elif quick_search == "Bedrooms":
             bedrooms = st.sidebar.slider("Number of bedrooms", 1, 5, 2)
             st.session_state.filters["bedrooms"] = str(bedrooms)
-
-    # Advanced Search
+    
+    # Advanced Search Mode
     elif search_mode == "Advanced Search":
         st.sidebar.subheader("Advanced Filters")
-        selected_filters = st.sidebar.multiselect("Select filters to apply", list(CATEGORY_OPTIONS.keys()), default=["rent", "area"])
+        
+        # Allow user to select multiple filters
+        selected_filters = st.sidebar.multiselect(
+            "Select filters to apply",
+            list(search_map.values())[:-1],  # Exclude "compare"
+            default=["rent", "area"]
+        )
+        
+        # Generate input fields for selected filters
         for field in selected_filters:
             if field in CATEGORY_OPTIONS and CATEGORY_OPTIONS[field]:
+                # For categorical fields, use selectbox
                 options = CATEGORY_OPTIONS[field]
-                selected_option = st.sidebar.selectbox(f"Select {field.replace('_',' ').title()}", options=options)
+                selected_option = st.sidebar.selectbox(
+                    f"Select {field.replace('_', ' ').title()}",
+                    options=options
+                )
                 st.session_state.filters[field] = selected_option
             elif field == "facilities":
-                selected_facilities = st.sidebar.multiselect("Select facilities", options=ALL_FACILITIES)
+                # For facilities, use multiselect
+                selected_facilities = st.sidebar.multiselect(
+                    "Select facilities",
+                    options=ALL_FACILITIES
+                )
                 st.session_state.filters[field] = ', '.join(selected_facilities)
             elif field == "nearby_amenities":
-                selected_amenities = st.sidebar.multiselect("Select nearby amenities", options=ALL_NEARBY_AMENITIES)
+                # For nearby amenities, use multiselect
+                selected_amenities = st.sidebar.multiselect(
+                    "Select nearby amenities",
+                    options=ALL_NEARBY_AMENITIES
+                )
                 st.session_state.filters[field] = ', '.join(selected_amenities)
             else:
-                user_input = st.sidebar.text_input(f"Enter {field.replace('_',' ').title()} (e.g. below 1000, between 1000 and 2000)")
+                # For numeric fields, provide text input with instructions
+                help_text = ""
+                if field in ["size", "carpet", "age", "security", "rent", "amenities", "bedrooms", "bathrooms", "balcony", "floor_no", "total_floors", "maintenance"]:
+                    help_text = "You can use: 'below 1000', 'above 500', 'between 500 and 1000', or exact number"
+                
+                user_input = st.sidebar.text_input(
+                    f"Enter {field.replace('_', ' ').title()}",
+                    help=help_text
+                )
                 if user_input:
                     st.session_state.filters[field] = user_input
-
-    # Compare Mode
-    else:
+    
+    # Compare Properties Mode
+    else:  # Compare Properties
         st.sidebar.subheader("Property Comparison")
-        property_ids = st.sidebar.text_input("Enter property IDs to compare (comma separated)", help="Example: 101, 102, 105")
+        property_ids = st.sidebar.text_input(
+            "Enter property IDs to compare (comma separated)",
+            help="Example: 101, 102, 105"
+        )
         if property_ids:
             st.session_state.filters["compare"] = property_ids
-
+    
+    # Apply filters button
     if st.sidebar.button("Apply Filters", type="primary"):
         st.session_state.apply_filters = True
     else:
-        st.session_state.apply
+        st.session_state.apply_filters = False
+    
+    # Reset filters button
+    if st.sidebar.button("Reset Filters"):
+        st.session_state.filters = {}
+        st.session_state.apply_filters = False
+        st.experimental_rerun()
+    
+    # Main content area
+    if st.session_state.apply_filters:
+        # Handle comparison mode
+        if search_mode == "Compare Properties" and "compare" in st.session_state.filters:
+            property_ids = [pid.strip().lower() for pid in st.session_state.filters["compare"].split(",")]
+            if len(property_ids) < 2:
+                st.warning("⚠️ Please enter at least two Property IDs to compare.")
+            else:
+                st.header("Property Comparison")
+                compare_properties_side_by_side(properties_data, property_ids)
+        else:
+            # Apply all selected filters
+            results = properties_data
+            for field, value in st.session_state.filters.items():
+                if field != "compare":
+                    results = filter_properties(value, field, results)
+            
+            if not results:
+                st.warning("❌ No properties found matching your criteria.")
+            else:
+                st.success(f"✅ Found {len(results)} properties matching your criteria.")
+                
+                # Create tabs for different views
+                tab1, tab2, tab3 = st.tabs(["List View", "Map View", "Analytics"])
+                
+                with tab1:
+                    # Group by property type
+                    grouped_results = defaultdict(list)
+                    for prop in results:
+                        property_type = prop.get("Room_Details", {}).get("Type", "Other/Unspecified Type")
+                        grouped_results[property_type].append(prop)
+                    
+                    # Display results grouped by property type
+                    for prop_type, props in grouped_results.items():
+                        st.subheader(f"🏠 Property Type: {str(prop_type).title()} ({len(props)} results)")
+                        
+                        # Create columns for better layout
+                        cols = st.columns(2)
+                        for i, prop in enumerate(props):
+                            with cols[i % 2]:
+                                with st.expander(f"ID: {prop.get('property_id', 'N/A')} | Rent: ₹{prop.get('Rent_Price', 'N/A')}"):
+                                    st.markdown(format_property(prop))
+                
+                with tab2:
+                    st.subheader("Property Locations")
+                    
+                    # Create and display the map
+                    try:
+                        property_map = create_property_map(results)
+                        folium_static(property_map, width=700, height=500)
+                        
+                        # Add map controls explanation
+                        st.markdown("""
+                        **Map Controls:**
+                        - Click on markers to see property details
+                        - Zoom in/out using the + and - buttons or mouse wheel
+                        - Drag to move around the map
+                        """)
+                    except Exception as e:
+                        st.error(f"Error displaying map: {str(e)}")
+                        st.info("Please check if you have a stable internet connection for map loading.")
+                
+                with tab3:
+                    st.subheader("Property Analytics")
+                    
+                    # Create analytics visualizations
+                    if results:
+                        # Convert to DataFrame for easier analysis
+                        df = pd.DataFrame(results)
+                        
+                        # Rent distribution
+                        st.subheader("Rent Distribution")
+                        fig_rent = px.histogram(
+                            df, 
+                            x="Rent_Price", 
+                            nbins=20,
+                            title="Distribution of Property Rents",
+                            labels={"Rent_Price": "Rent (₹)", "count": "Number of Properties"}
+                        )
+                        st.plotly_chart(fig_rent, use_container_width=True)
+                        
+                        # Property types
+                        st.subheader("Property Types")
+                        prop_types = [prop.get("Room_Details", {}).get("Type", "Unknown") for prop in results]
+                        type_counts = pd.Series(prop_types).value_counts()
+                        
+                        fig_types = px.pie(
+                            values=type_counts.values,
+                            names=type_counts.index,
+                            title="Distribution of Property Types"
+                        )
+                        st.plotly_chart(fig_types, use_container_width=True)
+                        
+                        # Area distribution
+                        if "Area" in df.columns:
+                            st.subheader("Properties by Area")
+                            area_counts = df["Area"].value_counts()
+                            
+                            fig_area = px.bar(
+                                x=area_counts.index,
+                                y=area_counts.values,
+                                labels={"x": "Area", "y": "Number of Properties"},
+                                title="Properties by Area"
+                            )
+                            st.plotly_chart(fig_area, use_container_width=True)
+    else:
+        # Display welcome message and sample properties
+        st.header("Welcome to Property Search Assistant")
+        st.markdown("""
+        Use the filters in the sidebar to find properties that match your criteria. 
+        You can search by various attributes like rent, area, property type, and more.
+        
+        **Features:**
+        - Simple and advanced search modes
+        - Property comparison tool
+        - Visual analytics
+        - Interactive map view
+        - Detailed property information
+        """)
+        
+        # Display some sample properties
+        st.subheader("Featured Properties")
+        sample_properties = properties_data[:4] if len(properties_data) >= 4 else properties_data
+        
+        cols = st.columns(2)
+        for i, prop in enumerate(sample_properties):
+            with cols[i % 2]:
+                with st.expander(f"ID: {prop.get('property_id', 'N/A')} | Rent: ₹{prop.get('Rent_Price', 'N/A')}"):
+                    st.markdown(format_property(prop))
+
+if __name__ == "__main__":
+    main()
