@@ -9,6 +9,8 @@ import folium
 from streamlit_folium import folium_static
 import requests
 import time
+import math
+from math import radians, sin, cos, sqrt, atan2
 
 # Set page configuration
 st.set_page_config(
@@ -86,6 +88,58 @@ def get_numeric_value(value):
         return None
     match = re.search(r"\d+", str(value))
     return int(match.group()) if match else None
+
+# --- Haversine formula for distance calculation ---
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    Returns distance in kilometers
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    
+    # Radius of earth in kilometers
+    r = 6371
+    return c * r
+
+# --- Define proximity points and amenities lists ---
+PROXIMITY_POINTS = [
+    "ATM Near Me",
+    "Airport Near Me",
+    "Bus Stop Near Me",
+    "Hospital Near Me",
+    "Mall Near Me",
+    "Market Near Me",
+    "Metro Station Near Me",
+    "Park Near Me",
+    "School Near Me"
+]
+
+AMENITIES_LIST = [
+    "Gym",
+    "Gated Community",
+    "Intercom",
+    "Lift",
+    "Pet Allowed",
+    "Pool",
+    "Security",
+    "Water Supply",
+    "Gas Pipeline",
+    "WiFi",
+    "Power Backup",
+    "Sports Facility",
+    "Fire Support",
+    "Kids Area",
+    "Garden",
+    "Parking"
+]
 
 # --- Dynamically get all unique values from the dataset ---
 ALL_AREAS = sorted(
@@ -267,7 +321,7 @@ def filter_properties(user_input, field, data):
     return filtered_properties
 
 # --- Format results ---
-def format_property(prop):
+def format_property(prop, distance=None):
     property_id = prop.get('property_id', 'N/A')
     rent_price = prop.get('Rent_Price', 'N/A')
     size = prop.get('Size_In_Sqft', 'Unknown')
@@ -296,8 +350,14 @@ def format_property(prop):
     rooms = prop.get("Room_Details", {}).get("Rooms", "N/A")
     property_type = prop.get("Room_Details", {}).get("Type", "N/A")
 
+    # Add distance information if available
+    distance_text = ""
+    if distance is not None:
+        distance_text = f"**Distance from you:** {distance:.2f} km\n\n"
+
     return (
         f"**ID:** {property_id} | **Rent:** ₹{rent_price} | **Size:** {size} sqft | **Carpet Area:** {carpet_area} sqft\n\n"
+        f"{distance_text}"
         f"**Rooms:** {rooms} | **Property Type:** {property_type} | **Bedrooms:** {bedrooms} | **Bathrooms:** {bathrooms} | **Balcony:** {balcony}\n\n"
         f"**Furnishing:** {furnishing_status} | **Security Deposit:** ₹{security_deposit} | **Brokerage:** {brokerage}\n\n"
         f"**Amenities:** {amenities}\n\n"
@@ -309,9 +369,9 @@ def format_property(prop):
     )
 
 # --- Create property map ---
-def create_property_map(properties):
+def create_property_map(properties, user_location=None):
     """
-    Create a Folium map with property markers for Nagpur.
+    Create a Folium map with property markers for Nagpur and user location.
     """
     # Default to Nagpur coordinates if no properties or location data
     default_lat, default_lon = 21.1458, 79.0882  # Nagpur coordinates
@@ -321,6 +381,43 @@ def create_property_map(properties):
     
     # Add tile layer with Google Maps style
     folium.TileLayer('OpenStreetMap').add_to(m)
+    
+    # Add user location marker if provided
+    if user_location:
+        folium.Marker(
+            location=user_location,
+            popup="Your Location",
+            tooltip="You are here",
+            icon=folium.Icon(color='black', icon='user')
+        ).add_to(m)
+    
+    # Calculate distances if user location is provided
+    distances = []
+    if user_location:
+        user_lat, user_lon = user_location
+        for prop in properties:
+            # Get property coordinates
+            if "Latitude" in prop and "Longitude" in prop:
+                prop_lat, prop_lon = prop["Latitude"], prop["Longitude"]
+            else:
+                # Try to geocode the area name within Nagpur
+                coords = geocode_area(prop.get("Area", "N/A"))
+                if coords:
+                    prop_lat, prop_lon = coords
+                else:
+                    # Skip if we can't get coordinates
+                    continue
+            
+            # Calculate distance
+            distance = haversine_distance(user_lat, user_lon, prop_lat, prop_lon)
+            distances.append(distance)
+            # Store distance in property for later use
+            prop["distance_from_user"] = distance
+        
+        # Calculate average distance
+        avg_distance = sum(distances) / len(distances) if distances else 0
+    else:
+        avg_distance = None
     
     # Add property markers
     for prop in properties:
@@ -343,12 +440,27 @@ def create_property_map(properties):
                 continue
         
         # Create popup text
+        distance_text = ""
+        marker_color = 'blue'
+        
+        if user_location and "distance_from_user" in prop:
+            distance = prop["distance_from_user"]
+            distance_text = f"<b>Distance:</b> {distance:.2f} km"
+            
+            # Set marker color based on distance compared to average
+            if avg_distance is not None:
+                if distance < avg_distance:
+                    marker_color = 'blue'  # Below average (closer)
+                else:
+                    marker_color = 'red'   # Above average (farther)
+        
         popup_text = f"""
         <b>ID:</b> {property_id}<br>
         <b>Rent:</b> ₹{rent_price}<br>
         <b>Area:</b> {area}<br>
         <b>Size:</b> {size} sqft<br>
-        <b>Type:</b> {property_type}
+        <b>Type:</b> {property_type}<br>
+        {distance_text}
         """
         
         # Add marker to the map
@@ -356,8 +468,22 @@ def create_property_map(properties):
             location=[lat, lon],
             popup=folium.Popup(popup_text, max_width=250),
             tooltip=f"ID: {property_id} | Rent: ₹{rent_price}",
-            icon=folium.Icon(color='blue', icon='home')
+            icon=folium.Icon(color=marker_color, icon='home')
         ).add_to(m)
+    
+    # Add legend for distance colors
+    if user_location and avg_distance is not None:
+        legend_html = '''
+        <div style="position: fixed; 
+                    bottom: 50px; left: 50px; width: 150px; height: 80px; 
+                    border:2px solid grey; z-index:9999; font-size:14px;
+                    background-color:white;
+                    ">&nbsp; <b>Distance Legend</b> <br>
+                    &nbsp; <i class="fa fa-map-marker fa-2x" style="color:blue"></i> Below Average <br>
+                    &nbsp; <i class="fa fa-map-marker fa-2x" style="color:red"></i> Above Average
+        </div>
+        '''
+        m.get_root().html.add_child(folium.Element(legend_html))
     
     return m
 
@@ -371,12 +497,40 @@ def main():
     if 'filters' not in st.session_state:
         st.session_state.filters = {}
     
+    # Initialize session state for user location
+    if 'user_location' not in st.session_state:
+        st.session_state.user_location = None
+    
     # Sidebar for filters
     st.sidebar.header("🔍 Search Filters")
     
     # Add Nagpur city badge
     st.sidebar.markdown("### 🔍 Search in Nagpur City")
     st.sidebar.info("All search results are limited to properties within Nagpur city limits.")
+    
+    # User location section
+    st.sidebar.subheader("📍 Your Location")
+    location_method = st.sidebar.radio(
+        "Select location method",
+        ["Enter Manually", "Use Current Location"]
+    )
+    
+    if location_method == "Enter Manually":
+        lat = st.sidebar.number_input("Latitude", value=21.1458, format="%.6f")
+        lon = st.sidebar.number_input("Longitude", value=79.0882, format="%.6f")
+        if st.sidebar.button("Set Location"):
+            st.session_state.user_location = (lat, lon)
+            st.sidebar.success("Location set successfully!")
+    else:
+        if st.sidebar.button("Get My Current Location"):
+            # This is a placeholder - in a real app, you would use browser geolocation
+            # For demo purposes, we'll use a default location in Nagpur
+            st.session_state.user_location = (21.1458, 79.0882)
+            st.sidebar.success("Using default Nagpur location. In a real app, this would get your current location.")
+    
+    # Display current user location if set
+    if st.session_state.user_location:
+        st.sidebar.info(f"Your location: {st.session_state.user_location[0]:.6f}, {st.session_state.user_location[1]:.6f}")
     
     # Search mode selection
     search_mode = st.sidebar.radio(
@@ -459,7 +613,7 @@ def main():
         # Allow user to select multiple filters
         selected_filters = st.sidebar.multiselect(
             "Select filters to apply",
-            list(search_map.values())[:-1],  # Exclude "compare"
+            list(search_map.values())[:-1] + ["proximity_points", "amenities_list"],  # Added new filters
             default=["rent", "area"]
         )
         
@@ -487,6 +641,20 @@ def main():
                     options=ALL_NEARBY_AMENITIES
                 )
                 st.session_state.filters[field] = ', '.join(selected_amenities)
+            elif field == "proximity_points":
+                # For proximity points, use multiselect with predefined list
+                selected_proximity = st.sidebar.multiselect(
+                    "Select proximity points",
+                    options=PROXIMITY_POINTS
+                )
+                st.session_state.filters[field] = ', '.join(selected_proximity)
+            elif field == "amenities_list":
+                # For amenities list, use multiselect with predefined list
+                selected_amenities_list = st.sidebar.multiselect(
+                    "Select amenities",
+                    options=AMENITIES_LIST
+                )
+                st.session_state.filters[field] = ', '.join(selected_amenities_list)
             else:
                 # For numeric fields, provide text input with instructions
                 help_text = ""
@@ -520,7 +688,7 @@ def main():
     if st.sidebar.button("Reset Filters"):
         st.session_state.filters = {}
         st.session_state.apply_filters = False
-        st.rerun()
+        st.experimental_rerun()
     
     # Main content area
     if st.session_state.apply_filters:
@@ -561,16 +729,19 @@ def main():
                         # Create columns for better layout
                         cols = st.columns(2)
                         for i, prop in enumerate(props):
+                            # Get distance if user location is set
+                            distance = prop.get("distance_from_user", None) if st.session_state.user_location else None
+                            
                             with cols[i % 2]:
                                 with st.expander(f"ID: {prop.get('property_id', 'N/A')} | Rent: ₹{prop.get('Rent_Price', 'N/A')}"):
-                                    st.markdown(format_property(prop))
+                                    st.markdown(format_property(prop, distance))
                 
                 with tab2:
                     st.subheader("Property Locations in Nagpur")
                     
                     # Create and display the map
                     try:
-                        property_map = create_property_map(results)
+                        property_map = create_property_map(results, st.session_state.user_location)
                         folium_static(property_map, width=700, height=500)
                         
                         # Add map controls explanation
@@ -579,6 +750,10 @@ def main():
                         - Click on markers to see property details
                         - Zoom in/out using the + and - buttons or mouse wheel
                         - Drag to move around the map
+                        - Your location is shown with a black marker
+                        - Property markers are color-coded by distance:
+                          - Blue: Below average distance from you
+                          - Red: Above average distance from you
                         """)
                     except Exception as e:
                         st.error(f"Error displaying map: {str(e)}")
@@ -627,6 +802,58 @@ def main():
                                 title="Properties by Area in Nagpur"
                             )
                             st.plotly_chart(fig_area, use_container_width=True)
+                        
+                        # Distance distribution if user location is set
+                        if st.session_state.user_location and "distance_from_user" in df.columns:
+                            st.subheader("Distance Distribution from Your Location")
+                            fig_distance = px.histogram(
+                                df,
+                                x="distance_from_user",
+                                nbins=15,
+                                title="Distribution of Property Distances from Your Location",
+                                labels={"distance_from_user": "Distance (km)", "count": "Number of Properties"}
+                            )
+                            # Add average distance line
+                            avg_distance = df["distance_from_user"].mean()
+                            fig_distance.add_vline(x=avg_distance, line_dash="dash", line_color="red",
+                                                 annotation_text=f"Avg: {avg_distance:.2f} km")
+                            st.plotly_chart(fig_distance, use_container_width=True)
+                        
+                        # Proximity points distribution
+                        if "proximity_points" in st.session_state.filters:
+                            st.subheader("Proximity Points Distribution")
+                            proximity_counts = {}
+                            for prop in results:
+                                for point in PROXIMITY_POINTS:
+                                    if prop.get("Nearby_Amenities", {}).get(point) == 1:
+                                        proximity_counts[point] = proximity_counts.get(point, 0) + 1
+                            
+                            if proximity_counts:
+                                fig_proximity = px.bar(
+                                    x=list(proximity_counts.keys()),
+                                    y=list(proximity_counts.values()),
+                                    labels={"x": "Proximity Point", "y": "Number of Properties"},
+                                    title="Properties by Selected Proximity Points"
+                                )
+                                st.plotly_chart(fig_proximity, use_container_width=True)
+                        
+                        # Amenities distribution
+                        if "amenities_list" in st.session_state.filters:
+                            st.subheader("Amenities Distribution")
+                            amenities_counts = {}
+                            for prop in results:
+                                for amenity in AMENITIES_LIST:
+                                    if prop.get("Facilities", {}).get(amenity) == 1:
+                                        amenities_counts[amenity] = amenities_counts.get(amenity, 0) + 1
+                            
+                            if amenities_counts:
+                                fig_amenities = px.bar(
+                                    x=list(amenities_counts.keys()),
+                                    y=list(amenities_counts.values()),
+                                    labels={"x": "Amenity", "y": "Number of Properties"},
+                                    title="Properties by Selected Amenities"
+                                )
+                                st.plotly_chart(fig_amenities, use_container_width=True)
     else:
         # Display welcome message and sample properties
         st.header("Welcome to Property Search Assistant - Nagpur")
@@ -638,8 +865,9 @@ def main():
         - Simple and advanced search modes
         - Property comparison tool
         - Visual analytics
-        - Interactive map view
+        - Interactive map view with distance calculations
         - Detailed property information
+        - Proximity points and amenities filtering
         """)
         
         # Display some sample properties
