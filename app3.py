@@ -642,7 +642,7 @@ def main():
     if st.sidebar.button("Reset Filters"):
         st.session_state.filters = {}
         st.session_state.apply_filters = False
-        st.experimental_rerun()
+        st.rerun()
     
     # Main content area
     if st.session_state.apply_filters:
