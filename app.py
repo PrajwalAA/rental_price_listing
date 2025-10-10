@@ -12,7 +12,7 @@ import time
 
 # Set page configuration
 st.set_page_config(
-    page_title="Property Search Assistant",
+    page_title="Property Search Assistant - Nagpur",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -23,7 +23,10 @@ st.set_page_config(
 def load_properties():
     try:
         with open("property_data.json", "r") as f:
-            return json.load(f)
+            properties = json.load(f)
+            # Filter properties to only include those in Nagpur
+            nagpur_properties = [p for p in properties if p.get("City", "").lower() == "nagpur" or p.get("Area", "").lower().find("nagpur") != -1]
+            return nagpur_properties
     except FileNotFoundError:
         st.error("Error: 'property_data.json' not found. Please ensure the file exists.")
         return []
@@ -37,12 +40,13 @@ properties_data = load_properties()
 @st.cache_data
 def geocode_area(area_name):
     """
-    Get latitude and longitude for an area name using Nominatim API.
+    Get latitude and longitude for an area name in Nagpur using Nominatim API.
     Returns a tuple (lat, lng) or None if not found.
     """
     try:
         # Using Nominatim API for geocoding (free and no API key required)
-        url = f"https://nominatim.openstreetmap.org/search?q={area_name}&format=json&limit=1"
+        # Append "Nagpur, India" to ensure we get locations within Nagpur
+        url = f"https://nominatim.openstreetmap.org/search?q={area_name}, Nagpur, India&format=json&limit=1"
         headers = {
             "User-Agent": "PropertySearchApp/1.0"
         }
@@ -307,25 +311,13 @@ def format_property(prop):
 # --- Create property map ---
 def create_property_map(properties):
     """
-    Create a Folium map with property markers.
+    Create a Folium map with property markers for Nagpur.
     """
-    # Default to Mumbai coordinates if no properties or location data
-    default_lat, default_lon = 19.0760, 72.8777  # Mumbai coordinates
+    # Default to Nagpur coordinates if no properties or location data
+    default_lat, default_lon = 21.1458, 79.0882  # Nagpur coordinates
     
-    # Create a map centered around the first property or default location
-    if properties and len(properties) > 0:
-        first_prop = properties[0]
-        area = first_prop.get("Area", "Mumbai")
-        coords = geocode_area(area)
-        if coords:
-            start_lat, start_lon = coords
-        else:
-            start_lat, start_lon = default_lat, default_lon
-    else:
-        start_lat, start_lon = default_lat, default_lon
-    
-    # Create the map
-    m = folium.Map(location=[start_lat, start_lon], zoom_start=12)
+    # Create a map centered around Nagpur
+    m = folium.Map(location=[default_lat, default_lon], zoom_start=12)
     
     # Add tile layer with Google Maps style
     folium.TileLayer('OpenStreetMap').add_to(m)
@@ -342,7 +334,7 @@ def create_property_map(properties):
         if "Latitude" in prop and "Longitude" in prop:
             lat, lon = prop["Latitude"], prop["Longitude"]
         else:
-            # Try to geocode the area name
+            # Try to geocode the area name within Nagpur
             coords = geocode_area(area)
             if coords:
                 lat, lon = coords
@@ -372,8 +364,8 @@ def create_property_map(properties):
 # --- Main App ---
 def main():
     # Header
-    st.title("🏠 Property Search Assistant")
-    st.markdown("Find your perfect property with our advanced search and comparison tools")
+    st.title("🏠 Property Search Assistant - Nagpur")
+    st.markdown("Find your perfect property in Nagpur with our advanced search and comparison tools")
     
     # Initialize session state for filters
     if 'filters' not in st.session_state:
@@ -381,6 +373,10 @@ def main():
     
     # Sidebar for filters
     st.sidebar.header("🔍 Search Filters")
+    
+    # Add Nagpur city badge
+    st.sidebar.markdown("### 🔍 Search in Nagpur City")
+    st.sidebar.info("All search results are limited to properties within Nagpur city limits.")
     
     # Search mode selection
     search_mode = st.sidebar.radio(
@@ -445,7 +441,7 @@ def main():
                 st.session_state.filters["rent"] = f"between {min_rent} and {max_rent}"
                 
         elif quick_search == "Area":
-            area = st.sidebar.selectbox("Select area", ALL_AREAS)
+            area = st.sidebar.selectbox("Select area in Nagpur", ALL_AREAS)
             st.session_state.filters["area"] = area
             
         elif quick_search == "Property Type":
@@ -524,7 +520,7 @@ def main():
     if st.sidebar.button("Reset Filters"):
         st.session_state.filters = {}
         st.session_state.apply_filters = False
-        st.rerun()
+        st.experimental_rerun()
     
     # Main content area
     if st.session_state.apply_filters:
@@ -544,9 +540,9 @@ def main():
                     results = filter_properties(value, field, results)
             
             if not results:
-                st.warning("❌ No properties found matching your criteria.")
+                st.warning("❌ No properties found matching your criteria in Nagpur.")
             else:
-                st.success(f"✅ Found {len(results)} properties matching your criteria.")
+                st.success(f"✅ Found {len(results)} properties matching your criteria in Nagpur.")
                 
                 # Create tabs for different views
                 tab1, tab2, tab3 = st.tabs(["List View", "Map View", "Analytics"])
@@ -570,7 +566,7 @@ def main():
                                     st.markdown(format_property(prop))
                 
                 with tab2:
-                    st.subheader("Property Locations")
+                    st.subheader("Property Locations in Nagpur")
                     
                     # Create and display the map
                     try:
@@ -589,7 +585,7 @@ def main():
                         st.info("Please check if you have a stable internet connection for map loading.")
                 
                 with tab3:
-                    st.subheader("Property Analytics")
+                    st.subheader("Property Analytics for Nagpur")
                     
                     # Create analytics visualizations
                     if results:
@@ -597,45 +593,45 @@ def main():
                         df = pd.DataFrame(results)
                         
                         # Rent distribution
-                        st.subheader("Rent Distribution")
+                        st.subheader("Rent Distribution in Nagpur")
                         fig_rent = px.histogram(
                             df, 
                             x="Rent_Price", 
                             nbins=20,
-                            title="Distribution of Property Rents",
+                            title="Distribution of Property Rents in Nagpur",
                             labels={"Rent_Price": "Rent (₹)", "count": "Number of Properties"}
                         )
                         st.plotly_chart(fig_rent, use_container_width=True)
                         
                         # Property types
-                        st.subheader("Property Types")
+                        st.subheader("Property Types in Nagpur")
                         prop_types = [prop.get("Room_Details", {}).get("Type", "Unknown") for prop in results]
                         type_counts = pd.Series(prop_types).value_counts()
                         
                         fig_types = px.pie(
                             values=type_counts.values,
                             names=type_counts.index,
-                            title="Distribution of Property Types"
+                            title="Distribution of Property Types in Nagpur"
                         )
                         st.plotly_chart(fig_types, use_container_width=True)
                         
                         # Area distribution
                         if "Area" in df.columns:
-                            st.subheader("Properties by Area")
+                            st.subheader("Properties by Area in Nagpur")
                             area_counts = df["Area"].value_counts()
                             
                             fig_area = px.bar(
                                 x=area_counts.index,
                                 y=area_counts.values,
                                 labels={"x": "Area", "y": "Number of Properties"},
-                                title="Properties by Area"
+                                title="Properties by Area in Nagpur"
                             )
                             st.plotly_chart(fig_area, use_container_width=True)
     else:
         # Display welcome message and sample properties
-        st.header("Welcome to Property Search Assistant")
+        st.header("Welcome to Property Search Assistant - Nagpur")
         st.markdown("""
-        Use the filters in the sidebar to find properties that match your criteria. 
+        Use the filters in the sidebar to find properties that match your criteria in Nagpur. 
         You can search by various attributes like rent, area, property type, and more.
         
         **Features:**
@@ -647,7 +643,7 @@ def main():
         """)
         
         # Display some sample properties
-        st.subheader("Featured Properties")
+        st.subheader("Featured Properties in Nagpur")
         sample_properties = properties_data[:4] if len(properties_data) >= 4 else properties_data
         
         cols = st.columns(2)
