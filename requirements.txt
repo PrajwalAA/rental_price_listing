@@ -6,3 +6,4 @@ spacy
 matplotlib
 tabulate
 plotly
+folium
