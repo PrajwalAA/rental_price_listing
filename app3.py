@@ -109,6 +109,38 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     r = 6371
     return c * r
 
+# --- Define proximity points and amenities lists ---
+PROXIMITY_POINTS = [
+    "ATM Near Me",
+    "Airport Near Me",
+    "Bus Stop Near Me",
+    "Hospital Near Me",
+    "Mall Near Me",
+    "Market Near Me",
+    "Metro Station Near Me",
+    "Park Near Me",
+    "School Near Me"
+]
+
+AMENITIES_LIST = [
+    "Gym",
+    "Gated Community",
+    "Intercom",
+    "Lift",
+    "Pet Allowed",
+    "Pool",
+    "Security",
+    "Water Supply",
+    "Gas Pipeline",
+    "WiFi",
+    "Power Backup",
+    "Sports Facility",
+    "Fire Support",
+    "Kids Area",
+    "Garden",
+    "Parking"
+]
+
 # --- Dynamically get all unique values from the dataset ---
 ALL_AREAS = sorted(
     list(set(normalize_area_name(p.get("Area", "N/A")) for p in properties_data))
@@ -581,7 +613,7 @@ def main():
         # Allow user to select multiple filters
         selected_filters = st.sidebar.multiselect(
             "Select filters to apply",
-            list(search_map.values())[:-1],  # Exclude "compare"
+            list(search_map.values())[:-1] + ["proximity_points", "amenities_list"],  # Added new filters
             default=["rent", "area"]
         )
         
@@ -609,6 +641,20 @@ def main():
                     options=ALL_NEARBY_AMENITIES
                 )
                 st.session_state.filters[field] = ', '.join(selected_amenities)
+            elif field == "proximity_points":
+                # For proximity points, use multiselect with predefined list
+                selected_proximity = st.sidebar.multiselect(
+                    "Select proximity points",
+                    options=PROXIMITY_POINTS
+                )
+                st.session_state.filters[field] = ', '.join(selected_proximity)
+            elif field == "amenities_list":
+                # For amenities list, use multiselect with predefined list
+                selected_amenities_list = st.sidebar.multiselect(
+                    "Select amenities",
+                    options=AMENITIES_LIST
+                )
+                st.session_state.filters[field] = ', '.join(selected_amenities_list)
             else:
                 # For numeric fields, provide text input with instructions
                 help_text = ""
@@ -772,6 +818,42 @@ def main():
                             fig_distance.add_vline(x=avg_distance, line_dash="dash", line_color="red",
                                                  annotation_text=f"Avg: {avg_distance:.2f} km")
                             st.plotly_chart(fig_distance, use_container_width=True)
+                        
+                        # Proximity points distribution
+                        if "proximity_points" in st.session_state.filters:
+                            st.subheader("Proximity Points Distribution")
+                            proximity_counts = {}
+                            for prop in results:
+                                for point in PROXIMITY_POINTS:
+                                    if prop.get("Nearby_Amenities", {}).get(point) == 1:
+                                        proximity_counts[point] = proximity_counts.get(point, 0) + 1
+                            
+                            if proximity_counts:
+                                fig_proximity = px.bar(
+                                    x=list(proximity_counts.keys()),
+                                    y=list(proximity_counts.values()),
+                                    labels={"x": "Proximity Point", "y": "Number of Properties"},
+                                    title="Properties by Selected Proximity Points"
+                                )
+                                st.plotly_chart(fig_proximity, use_container_width=True)
+                        
+                        # Amenities distribution
+                        if "amenities_list" in st.session_state.filters:
+                            st.subheader("Amenities Distribution")
+                            amenities_counts = {}
+                            for prop in results:
+                                for amenity in AMENITIES_LIST:
+                                    if prop.get("Facilities", {}).get(amenity) == 1:
+                                        amenities_counts[amenity] = amenities_counts.get(amenity, 0) + 1
+                            
+                            if amenities_counts:
+                                fig_amenities = px.bar(
+                                    x=list(amenities_counts.keys()),
+                                    y=list(amenities_counts.values()),
+                                    labels={"x": "Amenity", "y": "Number of Properties"},
+                                    title="Properties by Selected Amenities"
+                                )
+                                st.plotly_chart(fig_amenities, use_container_width=True)
     else:
         # Display welcome message and sample properties
         st.header("Welcome to Property Search Assistant - Nagpur")
@@ -785,6 +867,7 @@ def main():
         - Visual analytics
         - Interactive map view with distance calculations
         - Detailed property information
+        - Proximity points and amenities filtering
         """)
         
         # Display some sample properties
