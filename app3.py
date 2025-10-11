@@ -255,19 +255,28 @@ def filter_properties(user_input, field, data):
     if field in ["brokerage", "furnishing", "maintenance", "recommended_for", "water_supply", "society_type"]:
         filtered_properties = [p for p in data if str(p.get(data_field, "N/A")).lower() == normalized_user_input]
     
+    
     elif field == "facilities":
         user_facilities = [normalize_facility_name(f) for f in user_input.split(',')]
-        filtered_properties = [p for p in data if all(
-            normalize_facility_name(k) in user_facilities and v == 1
-            for k, v in p.get("Facilities", {}).items() if k
-        )]
+        filtered_properties = [
+            p for p in data 
+            if all(
+                any(normalize_facility_name(k) == fac and v == 1 
+                    for k, v in p.get("Facilities", {}).items())
+                for fac in user_facilities
+            )
+        ]
 
     elif field == "nearby_amenities":
         user_amenities = [normalize_amenity_name(f) for f in user_input.split(',')]
-        filtered_properties = [p for p in data if all(
-            normalize_amenity_name(k) in user_amenities and v == 1
-            for k, v in p.get("Nearby_Amenities", {}).items() if k
-        )]
+        filtered_properties = [
+            p for p in data 
+            if all(
+                any(normalize_amenity_name(k) == amen and v == 1 
+                    for k, v in p.get("Nearby_Amenities", {}).items())
+                for amen in user_amenities
+            )
+        ]
 
     elif field == "room_type":
         filtered_properties = [p for p in data if normalize_room_name(p.get("Room_Details", {}).get("Rooms", "")) == normalized_user_input]
