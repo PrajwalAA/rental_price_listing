@@ -620,11 +620,7 @@ def main():
         st.sidebar.subheader("Advanced Filters")
         
         # Allow user to select multiple filters
-        selected_filters = st.sidebar.multiselect(
-            "Select filters to apply",
-            list(search_map.values())[:-1] + ["proximity_points", "amenities_list"],  # Added new filters
-            default=["rent", "area"]
-        )
+        
         
         # Generate input fields for selected filters
         for field in selected_filters:
