@@ -14,7 +14,7 @@ from math import radians, sin, cos, sqrt, atan2
 
 # Set page configuration
 st.set_page_config(
-    page_title="Property Search Assistant - Nagpur",
+    page_title="Property Search Assistant - Nagpur app4",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
