@@ -110,36 +110,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return c * r
 
 # --- Define proximity points and amenities lists ---
-PROXIMITY_POINTS = [
-    "ATM Near Me",
-    "Airport Near Me",
-    "Bus Stop Near Me",
-    "Hospital Near Me",
-    "Mall Near Me",
-    "Market Near Me",
-    "Metro Station Near Me",
-    "Park Near Me",
-    "School Near Me"
-]
 
-AMENITIES_LIST = [
-    "Gym",
-    "Gated Community",
-    "Intercom",
-    "Lift",
-    "Pet Allowed",
-    "Pool",
-    "Security",
-    "Water Supply",
-    "Gas Pipeline",
-    "WiFi",
-    "Power Backup",
-    "Sports Facility",
-    "Fire Support",
-    "Kids Area",
-    "Garden",
-    "Parking"
-]
 
 # --- Dynamically get all unique values from the dataset ---
 ALL_AREAS = sorted(
