@@ -233,18 +233,17 @@ def filter_properties(user_input, field, data):
 
             normalize_facility_name(k) in user_facilities and v == 1
         for p in data:
-            for k, v in p.get("Facilities", {}).items() if k
             facilities_dict = p.get("Facilities", {})
-        )]
             if not isinstance(facilities_dict, dict):
                 continue
-
+                
             # Create a normalized version of the property's facilities
             normalized_facilities = {normalize_facility_name(k): v for k, v in facilities_dict.items()}
-
+            
             # Check if all user-selected facilities are present in the property's facilities (with value 1)
             if all(facility in normalized_facilities and normalized_facilities[facility] == 1 for facility in user_facilities):
                 filtered_properties.append(p)
+
 
     elif field == "nearby_amenities":
         user_amenities = [normalize_amenity_name(a.strip()) for a in user_input.split(',') if a.strip()]
@@ -254,15 +253,17 @@ def filter_properties(user_input, field, data):
 
             normalize_amenity_name(k) in user_amenities and v == 1
         for p in data:
-            for k, v in p.get("Nearby_Amenities", {}).items() if k
+            user_amenities = [normalize_amenity_name(a.strip()) for a in user_input.split(',') if a.strip()]
+        filtered_properties = []
+        
+        for p in data:
             amenities_dict = p.get("Nearby_Amenities", {})
-        )]
             if not isinstance(amenities_dict, dict):
                 continue
-
+                
             # Create a normalized version of the property's amenities
             normalized_amenities = {normalize_amenity_name(k): v for k, v in amenities_dict.items()}
-
+            
             # Check if all user-selected amenities are present in the property's amenities (with value 1)
             if all(amenity in normalized_amenities and normalized_amenities[amenity] == 1 for amenity in user_amenities):
                 filtered_properties.append(p)
