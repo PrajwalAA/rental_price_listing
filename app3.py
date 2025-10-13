@@ -109,10 +109,6 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     r = 6371
     return c * r
 
-# --- Define proximity points and amenities lists ---
-# Define these lists to avoid errors
-
-
 # --- Dynamically get all unique values from the dataset ---
 ALL_AREAS = sorted(
     list(set(normalize_area_name(p.get("Area", "N/A")) for p in properties_data))
@@ -620,7 +616,11 @@ def main():
         st.sidebar.subheader("Advanced Filters")
         
         # Allow user to select multiple filters
-        
+        selected_filters = st.sidebar.multiselect(
+            "Select filters to apply",
+            list(search_map.values())[:-1],  # Removed proximity_points and amenities_list
+            default=["rent", "area"]
+        )
         
         # Generate input fields for selected filters
         for field in selected_filters:
@@ -645,7 +645,7 @@ def main():
                     "Select nearby amenities",
                     options=ALL_NEARBY_AMENITIES
                 )
-                st.session_state.filters[field] = ', '.join(selected_amenities_list)
+                st.session_state.filters[field] = ', '.join(selected_amenities)
             else:
                 # For numeric fields, provide text input with instructions
                 help_text = ""
@@ -809,9 +809,6 @@ def main():
                             fig_distance.add_vline(x=avg_distance, line_dash="dash", line_color="red",
                                                  annotation_text=f"Avg: {avg_distance:.2f} km")
                             st.plotly_chart(fig_distance, use_container_width=True)
-                        
-                        # Proximity points distribution
-                        
     else:
         # Display welcome message and sample properties
         st.header("Welcome to Property Search Assistant - Nagpur")
@@ -825,6 +822,7 @@ def main():
         - Visual analytics
         - Interactive map view with distance calculations
         - Detailed property information
+        - Facilities and nearby amenities filtering
         """)
         
         # Display some sample properties
