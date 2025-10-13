@@ -110,9 +110,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return c * r
 
 # --- Define proximity points and amenities lists ---
-# Define these lists to avoid errors
-PROXIMITY_POINTS = ["School", "Hospital", "Market", "Park", "Restaurant"]
-AMENITIES_LIST = ["Parking", "Gym", "Swimming Pool", "Power Backup", "Security"]
+
 
 # --- Dynamically get all unique values from the dataset ---
 ALL_AREAS = sorted(
@@ -225,91 +223,87 @@ def filter_properties(user_input, field, data):
         return []
 
     normalized_user_input = user_input.lower().strip()
-    
-    # --- String fields ---
     if field in ["brokerage", "furnishing", "maintenance", "recommended_for", "water_supply", "society_type"]:
         filtered_properties = [p for p in data if str(p.get(data_field, "N/A")).lower() == normalized_user_input]
     
-    # --- Facilities field ---
     elif field == "facilities":
         user_facilities = [normalize_facility_name(f.strip()) for f in user_input.split(',') if f.strip()]
+        user_facilities = [normalize_facility_name(f) for f in user_input.split(',')]
         filtered_properties = []
-        
+        filtered_properties = [p for p in data if all(
+
+            normalize_facility_name(k) in user_facilities and v == 1
         for p in data:
+            for k, v in p.get("Facilities", {}).items() if k
             facilities_dict = p.get("Facilities", {})
+        )]
             if not isinstance(facilities_dict, dict):
                 continue
-                
+
             # Create a normalized version of the property's facilities
             normalized_facilities = {normalize_facility_name(k): v for k, v in facilities_dict.items()}
-            
+
             # Check if all user-selected facilities are present in the property's facilities (with value 1)
             if all(facility in normalized_facilities and normalized_facilities[facility] == 1 for facility in user_facilities):
                 filtered_properties.append(p)
 
-    # --- Nearby Amenities field ---
     elif field == "nearby_amenities":
         user_amenities = [normalize_amenity_name(a.strip()) for a in user_input.split(',') if a.strip()]
+        user_amenities = [normalize_amenity_name(f) for f in user_input.split(',')]
         filtered_properties = []
-        
+        filtered_properties = [p for p in data if all(
+
+            normalize_amenity_name(k) in user_amenities and v == 1
         for p in data:
+            for k, v in p.get("Nearby_Amenities", {}).items() if k
             amenities_dict = p.get("Nearby_Amenities", {})
+        )]
             if not isinstance(amenities_dict, dict):
                 continue
-                
+
             # Create a normalized version of the property's amenities
             normalized_amenities = {normalize_amenity_name(k): v for k, v in amenities_dict.items()}
-            
+
             # Check if all user-selected amenities are present in the property's amenities (with value 1)
             if all(amenity in normalized_amenities and normalized_amenities[amenity] == 1 for amenity in user_amenities):
                 filtered_properties.append(p)
 
-    # --- Room Type field ---
     elif field == "room_type":
-        filtered_properties = [p for p in data if 
-                              normalize_room_name(p.get("Room_Details", {}).get("Rooms", "")) == normalized_user_input]
+        filtered_properties = [p for p in data if normalize_room_name(p.get("Room_Details", {}).get("Rooms", "")) == normalized_user_input]
 
-    # --- Property Type field ---
     elif field == "property_type":
-        filtered_properties = [p for p in data if 
-                              normalize_property_type_name(p.get("Room_Details", {}).get("Type", "")) == normalized_user_input]
+        filtered_properties = [p for p in data if normalize_property_type_name(p.get("Room_Details", {}).get("Type", "")) == normalized_user_input]
 
-    # --- Area field ---
     elif field == "area":
-        filtered_properties = [p for p in data if 
-                              normalize_area_name(p.get("Area", "N/A")) == normalize_area_name(user_input)]
+        filtered_properties = [p for p in data if normalize_area_name(p.get("Area", "N/A")) == normalize_area_name(user_input)]
 
-    # --- Zone field ---
     elif field == "zone":
-        filtered_properties = [p for p in data if 
-                              normalize_zone_name(p.get("Zone", "N/A")) == normalize_zone_name(user_input)]
+        filtered_properties = [p for p in data if normalize_zone_name(p.get("Zone", "N/A")) == normalize_zone_name(user_input)]
         
-    # --- Property ID field ---
     elif field == "id":
         property_ids = [pid.strip().lower() for pid in user_input.split(",")]
         filtered_properties = [p for p in data if str(p.get("property_id", "")).lower() in property_ids]
     
-    # --- Numeric fields ---
     else:
         try:
-            # Handle numeric comparisons
             val = get_numeric_value(user_input)
             if val is None:
                 return []
-            
-            if user_input.lower().startswith("below"):
+ 
+ 
+            if user_input.startswith("below"):
                 filtered_properties = [
                     p for p in data
                     if get_numeric_value(p.get(data_field)) is not None
                     and get_numeric_value(p.get(data_field)) < val
                 ]
-            elif user_input.lower().startswith("above"):
+            elif user_input.startswith("above"):
                 filtered_properties = [
                     p for p in data
                     if get_numeric_value(p.get(data_field)) is not None
                     and get_numeric_value(p.get(data_field)) > val
                 ]
-            elif user_input.lower().startswith("between"):
+            elif user_input.startswith("between"):
                 nums = re.findall(r"\d+", user_input)
                 if len(nums) >= 2:
                     low, high = int(nums[0]), int(nums[1])
@@ -319,12 +313,11 @@ def filter_properties(user_input, field, data):
                         and low <= get_numeric_value(p.get(data_field)) <= high
                     ]
             else:
-                # Exact match
                 filtered_properties = [
                     p for p in data
                     if get_numeric_value(p.get(data_field)) == val
                 ]
-        except Exception as e:
+        except Exception:
             st.warning(f"Error filtering by {field}: {str(e)}")
             return []
 
@@ -623,7 +616,7 @@ def main():
         # Allow user to select multiple filters
         selected_filters = st.sidebar.multiselect(
             "Select filters to apply",
-            list(search_map.values())[:-1] + ["proximity_points", "amenities_list"],  # Added new filters
+            list(search_map.values())[:-1],  # Added new filters
             default=["rent", "area"]
         )
         
@@ -877,7 +870,6 @@ def main():
         - Visual analytics
         - Interactive map view with distance calculations
         - Detailed property information
-        - Proximity points and amenities filtering
         """)
         
         # Display some sample properties
