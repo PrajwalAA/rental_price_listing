@@ -111,8 +111,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
 
 # --- Define proximity points and amenities lists ---
 # Define these lists to avoid errors
-PROXIMITY_POINTS = ["School", "Hospital", "Market", "Park", "Restaurant"]
-AMENITIES_LIST = ["Parking", "Gym", "Swimming Pool", "Power Backup", "Security"]
+
 
 # --- Dynamically get all unique values from the dataset ---
 ALL_AREAS = sorted(
@@ -830,7 +829,6 @@ def main():
         - Visual analytics
         - Interactive map view with distance calculations
         - Detailed property information
-        - Proximity points and amenities filtering
         """)
         
         # Display some sample properties
