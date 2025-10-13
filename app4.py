@@ -228,7 +228,6 @@ def filter_properties(user_input, field, data):
     
     elif field == "facilities":
         user_facilities = [normalize_facility_name(f.strip()) for f in user_input.split(',') if f.strip()]
-        user_facilities = [normalize_facility_name(f) for f in user_input.split(',')]
         filtered_properties = []
         filtered_properties = [p for p in data if all(
 
@@ -249,7 +248,7 @@ def filter_properties(user_input, field, data):
 
     elif field == "nearby_amenities":
         user_amenities = [normalize_amenity_name(a.strip()) for a in user_input.split(',') if a.strip()]
-        user_amenities = [normalize_amenity_name(f) for f in user_input.split(',')]
+        
         filtered_properties = []
         filtered_properties = [p for p in data if all(
 
