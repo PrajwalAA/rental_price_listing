@@ -9,6 +9,7 @@ from collections import defaultdict
 import re
 import math
 from math import radians, sin, cos, sqrt, atan2
+import requests
 
 # Set page configuration
 st.set_page_config(
@@ -56,6 +57,29 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     # Radius of earth in kilometers
     r = 6371
     return c * r
+
+# --- Geocoding function to get coordinates from area name ---
+@st.cache_data
+def geocode_area(area_name):
+    """
+    Get latitude and longitude for an area name using Nominatim API.
+    Returns a tuple (lat, lng) or None if not found.
+    """
+    try:
+        # Using Nominatim API for geocoding (free and no API key required)
+        url = f"https://nominatim.openstreetmap.org/search?q={area_name}&format=json&limit=1"
+        headers = {
+            "User-Agent": "PropertySearchApp/1.0"
+        }
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                return float(data[0]["lat"]), float(data[0]["lon"])
+        return None
+    except Exception as e:
+        st.warning(f"Geocoding error for {area_name}: {str(e)}")
+        return None
 
 # --- Function to format property details ---
 def format_property(prop, distance=None):
@@ -333,11 +357,17 @@ def create_property_map(properties, user_location=None):
     if user_location:
         user_lat, user_lon = user_location
         for prop in properties:
-            # For demo purposes, we'll use random coordinates for properties
-            # In a real app, you would have actual coordinates in your data
-            import random
-            prop_lat = default_lat + random.uniform(-0.1, 0.1)
-            prop_lon = default_lon + random.uniform(-0.1, 0.1)
+            # Try to get coordinates from property data
+            if "latitude" in prop and "longitude" in prop:
+                prop_lat, prop_lon = prop["latitude"], prop["longitude"]
+            else:
+                # Try to geocode the area name
+                coords = geocode_area(prop.get("area", "N/A"))
+                if coords:
+                    prop_lat, prop_lon = coords
+                else:
+                    # Skip if we can't get coordinates
+                    continue
             
             # Calculate distance using Haversine formula
             distance = haversine_distance(user_lat, user_lon, prop_lat, prop_lon)
@@ -357,10 +387,17 @@ def create_property_map(properties, user_location=None):
         size = prop.get('size_in_sqft', 'Unknown')
         property_type = prop.get('property_type', 'N/A')
         
-        # For demo purposes, generate random coordinates around Nagpur
-        import random
-        lat = default_lat + random.uniform(-0.1, 0.1)
-        lon = default_lon + random.uniform(-0.1, 0.1)
+        # Get coordinates for the property
+        if "latitude" in prop and "longitude" in prop:
+            lat, lon = prop["latitude"], prop["longitude"]
+        else:
+            # Try to geocode the area name
+            coords = geocode_area(area)
+            if coords:
+                lat, lon = coords
+            else:
+                # Skip if we can't get coordinates
+                continue
         
         # Create popup text
         distance_text = ""
@@ -458,10 +495,47 @@ def main():
             st.sidebar.success("Location set successfully!")
     else:
         if st.sidebar.button("Get My Current Location"):
-            # This is a placeholder - in a real app, you would use browser geolocation
-            # For demo purposes, we'll use a default location
-            st.session_state.user_location = (21.1458, 79.0882)
-            st.sidebar.success("Using default location. In a real app, this would get your current location.")
+            # Get user's current location using browser geolocation
+            js_code = """
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    window.parent.postMessage({
+                        type: 'geolocation',
+                        data: {
+                            latitude: position.coords.latitude,
+                            longitude: position.coords.longitude
+                        }
+                    }, '*');
+                },
+                (error) => {
+                    window.parent.postMessage({
+                        type: 'geolocation',
+                        data: null
+                    }, '*');
+                }
+            );
+            """
+            
+            # Display the JavaScript code in a hidden component
+            st.components.v1.html(f"""
+            <script>
+            {js_code}
+            </script>
+            """, height=0)
+            
+            # Wait for the message from the JavaScript
+            if 'geolocation_data' not in st.session_state:
+                st.session_state.geolocation_data = None
+            
+            # Check if we received geolocation data
+            if st.session_state.geolocation_data:
+                lat, lon = st.session_state.geolocation_data
+                st.session_state.user_location = (lat, lon)
+                st.sidebar.success("Current location detected successfully!")
+            else:
+                st.warning("Unable to detect your location. Please enable location access or enter manually.")
+                # Use default Nagpur location as fallback
+                st.session_state.user_location = (21.1458, 79.0882)
     
     # Display current user location if set
     if st.session_state.user_location:
@@ -1005,6 +1079,29 @@ def main():
             with cols[i % 2]:
                 with st.expander(f"ID: {prop.get('property_id', 'N/A')} | Rent: ₹{prop.get('rent_price', 'N/A')}"):
                     st.markdown(format_property(prop))
+
+# Add JavaScript for geolocation
+st.components.v1.html("""
+<script>
+window.addEventListener('message', function(event) {
+    if (event.data.type === 'geolocation') {
+        // Send the geolocation data to Streamlit
+        fetch('/_st_geolocation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(event.data.data)
+        });
+    }
+});
+</script>
+""", height=0)
+
+# Add a hidden endpoint to receive geolocation data
+@st.experimental_memo
+def handle_geolocation(data):
+    st.session_state.geolocation_data = data
 
 if __name__ == "__main__":
     main()
