@@ -138,73 +138,37 @@ st.markdown("### 📋 PG Listings")
 for idx, row in filtered_df.iterrows():
     rent_class = "avg-rent-highlight" if row['Rent Price'] > avg_rent else "below-avg-rent"
     with st.expander(f"**{row['PG Name']}** - {row['Shearing']} | ₹{row['Rent Price']}", expanded=False):
-        st.markdown(f"""
-        <div class="pg-details">
-            <div class="detail-row"><span class="detail-label">Listing Title:</span><span class="detail-value">{row['Listing Title']}</span></div>
-            <div class="detail-row"><span class="detail-label">Location:</span><span class="detail-value">{row['Area']}, {row['City']}, {row['Zone']}</span></div>
-            <div class="detail-row"><span class="detail-label">Best Suit For:</span><span class="detail-value">{row['Best Suit For']}</span></div>
-            <div class="detail-row"><span class="detail-label">Meals:</span><span class="detail-value">{row['Meals Available']}</span></div>
-            <div class="detail-row"><span class="detail-label">Notice Period:</span><span class="detail-value">{row['Notice Period']}</span></div>
-            <div class="detail-row"><span class="detail-label">Lock-in Period:</span><span class="detail-value">{row['Lock-in Period']}</span></div>
-            <div class="detail-row"><span class="detail-label">Non-Veg Allowed:</span><span class="detail-value">{row['Non-Veg Allowed']}</span></div>
-            <div class="detail-row"><span class="detail-label">Opposite Gender Allowed:</span><span class="detail-value">{row['Opposite Gender Allowed']}</span></div>
-            <div class="detail-row"><span class="detail-label">Visitors Allowed:</span><span class="detail-value">{row['Visitors Allowed']}</span></div>
-            <div class="detail-row"><span class="detail-label">Drinking Allowed:</span><span class="detail-value">{row['Drinking Allowed']}</span></div>
-            <div class="detail-row"><span class="detail-label">Smoking Allowed:</span><span class="detail-value">{row['Smoking Allowed']}</span></div>
-            <div class="detail-row"><span class="detail-label">Security Deposit:</span><span class="detail-value">₹{row['Security Deposit']}</span></div>
+    st.markdown(f"""
+    <div class="pg-details">
+        <div class="detail-row"><span class="detail-label">Listing Title:</span><span class="detail-value">{row['Listing Title']}</span></div>
+        <div class="detail-row"><span class="detail-label">Location:</span><span class="detail-value">{row['Area']}, {row['City']}, {row['Zone']}</span></div>
+        <div class="detail-row"><span class="detail-label">Best Suit For:</span><span class="detail-value">{row['Best Suit For']}</span></div>
+        <div class="detail-row"><span class="detail-label">Meals:</span><span class="detail-value">{row['Meals Available']}</span></div>
+        <div class="detail-row"><span class="detail-label">Notice Period:</span><span class="detail-value">{row['Notice Period']}</span></div>
+        <div class="detail-row"><span class="detail-label">Lock-in Period:</span><span class="detail-value">{row['Lock-in Period']}</span></div>
+        <div class="detail-row"><span class="detail-label">Non-Veg Allowed:</span><span class="detail-value">{row['Non-Veg Allowed']}</span></div>
+        <div class="detail-row"><span class="detail-label">Opposite Gender Allowed:</span><span class="detail-value">{row['Opposite Gender Allowed']}</span></div>
+        <div class="detail-row"><span class="detail-label">Visitors Allowed:</span><span class="detail-value">{row['Visitors Allowed']}</span></div>
+        <div class="detail-row"><span class="detail-label">Drinking Allowed:</span><span class="detail-value">{row['Drinking Allowed']}</span></div>
+        <div class="detail-row"><span class="detail-label">Smoking Allowed:</span><span class="detail-value">{row['Smoking Allowed']}</span></div>
+        <div class="detail-row"><span class="detail-label">Security Deposit:</span><span class="detail-value">₹{row['Security Deposit']}</span></div>
 
-            <div style="margin-top: 1rem;">
-                <span class="detail-label">Amenities:</span>
-                <div class="amenities">
-                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Amenities', [])])}
-                </div>
-            </div>
-
-            <div style="margin-top: 1rem;">
-                <span class="detail-label">Common Areas:</span>
-                <div class="amenities">
-                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Common Area', [])])}
-                </div>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+        <div style="margin-top: 1rem;">
+            <span class="detail-label">Amenities:</span>
+            <div class="amenities">
+                {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Amenities', [])])}
             </div>
         </div>
-        """, unsafe_allow_html=True)
+
+        <div style="margin-top: 1rem;">
+            <span class="detail-label">Common Areas:</span>
+            <div class="amenities">
+                {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Common Area', [])])}
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 
 
 # --- Map View ---
