@@ -13,8 +13,10 @@ with open("pg.json", "r") as f:
 
 df = pd.DataFrame(pg_data)
 
-# --- Handle possible missing columns ---
-df["Amenities"] = df.get("Amenities", []).fillna([]) if "Amenities" in df else [[] for _ in range(len(df))]
+# --- Handle possible missing columns ---if "Amenities" in df:
+    df["Amenities"] = df["Amenities"].apply(lambda x: x if isinstance(x, list) else [])
+else:
+    df["Amenities"] = [[] for _ in range(len(df))]
 df["Common Area"] = df.get("Common Area", []).fillna([]) if "Common Area" in df else [[] for _ in range(len(df))]
 
 # --- Page Configuration ---
