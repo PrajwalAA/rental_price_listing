@@ -181,7 +181,7 @@ if not filtered_df.empty:
         folium.Marker(
             [lat, lon],
             popup=folium.Popup(popup_html, max_width=250),
-            tooltip=row["Area"],
+            tooltip=row["Location"],
             icon=folium.Icon(color=color, icon='home', prefix='fa')
         ).add_to(m)
 
