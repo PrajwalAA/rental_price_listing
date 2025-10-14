@@ -14,7 +14,7 @@ from math import radians, sin, cos, sqrt, atan2
 
 # Set page configuration
 st.set_page_config(
-    page_title="Property Search Assistant - Nagpur",
+    page_title="Property Search Assistant - Nagpur app4",
     page_icon="🏠",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -506,36 +506,43 @@ def main():
     if 'user_location' not in st.session_state:
         st.session_state.user_location = None
     
-    # Sidebar for filters
-    st.sidebar.header("🔍 Search Filters")
+    # Add Nagpur city badge at the top
+    st.markdown("### 🔍 Search in Nagpur City")
+    st.info("All search results are limited to properties within Nagpur city limits.")
     
-    # Add Nagpur city badge
-    st.sidebar.markdown("### 🔍 Search in Nagpur City")
-    st.sidebar.info("All search results are limited to properties within Nagpur city limits.")
+    # User location section moved to main area
+    st.subheader("📍 Your Location")
+    col1, col2 = st.columns(2)
     
-    # User location section
-    st.sidebar.subheader("📍 Your Location")
-    location_method = st.sidebar.radio(
-        "Select location method",
-        ["Enter Manually", "Use Current Location"]
-    )
+    with col1:
+        location_method = st.radio(
+            "Select location method",
+            ["Enter Manually", "Use Current Location"]
+        )
     
-    if location_method == "Enter Manually":
-        lat = st.sidebar.number_input("Latitude", value=21.1458, format="%.6f")
-        lon = st.sidebar.number_input("Longitude", value=79.0882, format="%.6f")
-        if st.sidebar.button("Set Location"):
-            st.session_state.user_location = (lat, lon)
-            st.sidebar.success("Location set successfully!")
-    else:
-        if st.sidebar.button("Get My Current Location"):
-            # This is a placeholder - in a real app, you would use browser geolocation
-            # For demo purposes, we'll use a default location in Nagpur
-            st.session_state.user_location = (21.1458, 79.0882)
-            st.sidebar.success("Using default Nagpur location. In a real app, this would get your current location.")
+    with col2:
+        if location_method == "Enter Manually":
+            lat_col, lon_col = st.columns(2)
+            with lat_col:
+                lat = st.number_input("Latitude", value=21.1458, format="%.6f")
+            with lon_col:
+                lon = st.number_input("Longitude", value=79.0882, format="%.6f")
+            if st.button("Set Location"):
+                st.session_state.user_location = (lat, lon)
+                st.success("Location set successfully!")
+        else:
+            if st.button("Get My Current Location"):
+                # This is a placeholder - in a real app, you would use browser geolocation
+                # For demo purposes, we'll use a default location in Nagpur
+                st.session_state.user_location = (21.1458, 79.0882)
+                st.success("Using default Nagpur location. In a real app, this would get your current location.")
     
     # Display current user location if set
     if st.session_state.user_location:
-        st.sidebar.info(f"Your location: {st.session_state.user_location[0]:.6f}, {st.session_state.user_location[1]:.6f}")
+        st.info(f"Your location: {st.session_state.user_location[0]:.6f}, {st.session_state.user_location[1]:.6f}")
+    
+    # Sidebar for filters
+    st.sidebar.header("🔍 Search Filters")
     
     # Search mode selection
     search_mode = st.sidebar.radio(
@@ -669,17 +676,21 @@ def main():
         if property_ids:
             st.session_state.filters["compare"] = property_ids
     
-    # Apply filters button
-    if st.sidebar.button("Apply Filters", type="primary"):
-        st.session_state.apply_filters = True
-    else:
-        st.session_state.apply_filters = False
+    # Apply filters button - more prominent
+    st.sidebar.markdown("---")
+    apply_col, reset_col = st.sidebar.columns(2)
     
-    # Reset filters button
-    if st.sidebar.button("Reset Filters"):
-        st.session_state.filters = {}
-        st.session_state.apply_filters = False
-        st.rerun()
+    with apply_col:
+        if st.button("Apply Filters", type="primary"):
+            st.session_state.apply_filters = True
+        else:
+            st.session_state.apply_filters = False
+    
+    with reset_col:
+        if st.button("Reset Filters"):
+            st.session_state.filters = {}
+            st.session_state.apply_filters = False
+            st.rerun()
     
     # Main content area
     if st.session_state.apply_filters:
