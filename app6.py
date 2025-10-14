@@ -6,10 +6,19 @@ from streamlit_folium import folium_static
 import plotly.express as px
 import random
 from branca.element import Element
+import numpy as np
 
 # --- Load JSON data ---
-with open("pg.json", "r") as f:
-    pg_data = json.load(f)
+# NOTE: This assumes 'pg.json' is in the same directory and contains the required data.
+try:
+    with open("pg.json", "r") as f:
+        pg_data = json.load(f)
+except FileNotFoundError:
+    st.error("Error: 'pg.json' file not found. Please ensure the data file is in the correct location.")
+    st.stop()
+except json.JSONDecodeError:
+    st.error("Error: 'pg.json' is not a valid JSON file.")
+    st.stop()
 
 df = pd.DataFrame(pg_data)
 
@@ -25,7 +34,7 @@ for col in ["Amenities", "Common Area"]:
 # --- Page Configuration ---
 st.set_page_config(page_title="PG Finder Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-# --- Custom CSS ---
+# --- Custom CSS (As provided and corrected for amenity tags) ---
 st.markdown("""
 <style>
     .main-header {
@@ -59,14 +68,14 @@ st.markdown("""
     .detail-value { color: #1e293b; }
     .amenities-container { margin-top: 0.5rem; }
     .amenity-tag { 
-        display: inline-block; /* Essential for proper layout */
+        display: inline-block; 
         background-color: #dbeafe; 
         color: #1d4ed8; 
         padding: 0.25rem 0.75rem; 
         border-radius: 9999px; 
         font-size: 0.875rem; 
         margin-right: 0.5rem; 
-        margin-bottom: 0.5rem; /* Add spacing for wrapping */
+        margin-bottom: 0.5rem; 
     }
     .map-container { height: 500px; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
     .chart-container { background-color: #ffffff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); margin-bottom: 1.5rem; }
@@ -85,10 +94,8 @@ def create_tags_html(items: list) -> str:
     
     tags_html = ""
     for item in items:
-        # Strip potential leading/trailing whitespace from list items
         tags_html += f'<span class="amenity-tag">{item.strip()}</span>'
     return f'<div class="amenities-container">{tags_html}</div>'
-
 
 # --- Main Header ---
 st.markdown('<div class="main-header">🏠 PG Listings Dashboard</div>', unsafe_allow_html=True)
@@ -96,7 +103,7 @@ st.markdown('<div class="main-header">🏠 PG Listings Dashboard</div>', unsafe_
 # --- Sidebar Filters ---
 st.sidebar.markdown('<div class="filter-header">🔍 Filter Options</div>', unsafe_allow_html=True)
 
-# Note: The original code's sidebar filter definitions are correct and remain the same.
+# Sidebar Filter Definitions (Rest of the original sidebar code)
 listing_title = st.sidebar.selectbox("Listing Title", options=["Any"] + df["Listing Title"].unique().tolist())
 city = st.sidebar.selectbox("City", options=["Any"] + df["City"].unique().tolist())
 area = st.sidebar.selectbox("Area", options=["Any"] + df["Area"].unique().tolist())
@@ -112,7 +119,8 @@ opposite_gender = st.sidebar.selectbox("Opposite Gender Allowed", options=["Any"
 visitors = st.sidebar.selectbox("Visitors Allowed", options=["Any", "Yes", "No"])
 drinking = st.sidebar.selectbox("Drinking Allowed", options=["Any", "Yes", "No"])
 smoking = st.sidebar.selectbox("Smoking Allowed", options=["Any", "Yes", "No"])
-# Ensure max rent is only calculated on numeric values in case of bad data
+
+# Safely get max rent for the slider default
 max_rent_value = int(df["Rent Price"].max()) if not df.empty and pd.api.types.is_numeric_dtype(df["Rent Price"]) else 100000
 rent_max = st.sidebar.number_input("Max Rent", min_value=0, value=max_rent_value)
 
@@ -124,7 +132,6 @@ def filter_dropdown(df, column, value):
         return df[df[column] == value]
     return df
 
-# The original filtering logic is correct and remains the same.
 filtered_df = filter_dropdown(filtered_df, "Listing Title", listing_title)
 filtered_df = filter_dropdown(filtered_df, "City", city)
 filtered_df = filter_dropdown(filtered_df, "Area", area)
@@ -146,16 +153,15 @@ if drinking != "Any":
     filtered_df = filtered_df[filtered_df["Drinking Allowed"] == drinking]
 if smoking != "Any":
     filtered_df = filtered_df[filtered_df["Smoking Allowed"] == smoking]
-# Filter rent safely
 if not filtered_df.empty:
     filtered_df = filtered_df[filtered_df["Rent Price"] <= rent_max]
 
+# --- Average Rent Calculation ---
+avg_rent = filtered_df["Rent Price"].mean() if not filtered_df.empty and pd.api.types.is_numeric_dtype(filtered_df["Rent Price"]) else 0
+
 # --- Results Header ---
 st.markdown(f"### 🏠 Found **{len(filtered_df)}** PG Listings matching your criteria")
-
-# --- Average Rent ---
-avg_rent = filtered_df["Rent Price"].mean() if not filtered_df.empty and pd.api.types.is_numeric_dtype(filtered_df["Rent Price"]) else 0
-st.markdown(f"#### 💰 Average Rent: **₹{avg_rent:,.2f}**") # Added thousands separator for clarity
+st.markdown(f"#### 💰 Average Rent: **₹{avg_rent:,.2f}**") 
 
 # --- PG Listings ---
 st.markdown("### 📋 PG Listings")
@@ -164,12 +170,8 @@ if filtered_df.empty:
     st.info("No listings match the current filters.")
 else:
     for idx, row in filtered_df.iterrows():
-        # Generate HTML for Amenities and Common Area
-        amenities_html = create_tags_html(row['Amenities'])
-        common_area_html = create_tags_html(row['Common Area'])
-        
-        # Determine rent class (though not used on the outer card, good for context)
-        # rent_class = "avg-rent-highlight" if row['Rent Price'] > avg_rent else "below-avg-rent"
+        amenities_html = create_tags_html(row.get('Amenities', []))
+        common_area_html = create_tags_html(row.get('Common Area', []))
         
         with st.expander(f"**{row['PG Name']}** - {row['Shearing']} | **₹{row['Rent Price']}**", expanded=False):
             st.markdown(f"""
@@ -201,32 +203,38 @@ else:
             """, unsafe_allow_html=True)
 
 
-# --- Map View ---
+# --- Map View: Displays the PG listings on a map ---
 st.markdown("### 🗺️ Map View")
-if not filtered_df.empty and "Latitude" in filtered_df.columns and "Longitude" in filtered_df.columns:
-    # Filter out rows where Latitude or Longitude might be NaN or not numeric for a cleaner map
-    map_df = filtered_df.dropna(subset=["Latitude", "Longitude"])
-    if not map_df.empty and pd.api.types.is_numeric_dtype(map_df["Latitude"]) and pd.api.types.is_numeric_dtype(map_df["Longitude"]):
-        
+if "Latitude" in filtered_df.columns and "Longitude" in filtered_df.columns:
+    # Convert coordinates to numeric and drop rows with invalid (NaN) coordinates
+    map_df = filtered_df.copy()
+    map_df["Latitude"] = pd.to_numeric(map_df["Latitude"], errors='coerce')
+    map_df["Longitude"] = pd.to_numeric(map_df["Longitude"], errors='coerce')
+    map_df = map_df.dropna(subset=["Latitude", "Longitude"])
+
+    if not map_df.empty:
+        # Center the map on the mean coordinates of the filtered data
         map_center = [map_df["Latitude"].mean(), map_df["Longitude"].mean()]
         m = folium.Map(location=map_center, zoom_start=12)
         
         for _, row in map_df.iterrows():
             lat, lon = row["Latitude"], row["Longitude"]
-            # Safely check against avg_rent, which might be 0 if the original DF was empty/non-numeric
-            color = 'red' if avg_rent > 0 and row['Rent Price'] > avg_rent else 'blue'
             
-            # Use 'Location' or 'PG Name' for tooltip
-            tooltip_text = row.get("PG Name", row.get("Location", "PG Listing"))
-            
+            # Determine marker color based on rent comparison
+            color = 'blue' 
+            rent_label = "Below Average"
+            if avg_rent > 0 and row['Rent Price'] > avg_rent:
+                color = 'red'
+                rent_label = "Above Average"
+
             popup_html = f"<b>{row.get('PG Name', 'N/A')}</b><br>Rent: ₹{row['Rent Price']}<br>"
             if avg_rent > 0:
-                popup_html += f"<span style='color:{color};'>{'Above Average' if row['Rent Price'] > avg_rent else 'Below Average'}</span>"
+                popup_html += f"<span style='color:{color}; font-weight: bold;'>{rent_label}</span>"
             
             folium.Marker(
                 [lat, lon],
                 popup=folium.Popup(popup_html, max_width=250),
-                tooltip=tooltip_text,
+                tooltip=row.get("Location", row.get("PG Name", "PG Listing")),
                 icon=folium.Icon(color=color, icon='home', prefix='fa')
             ).add_to(m)
 
@@ -241,14 +249,15 @@ if not filtered_df.empty and "Latitude" in filtered_df.columns and "Longitude" i
             </div>'''
         m.get_root().html.add_child(Element(legend_html))
 
+        # Render the map
         with st.container():
-            folium_static(m, width=1000, height=500) # Explicitly set width to match layout
+            folium_static(m, width=1000, height=500)
     else:
-        st.warning("No listings with valid geographic coordinates to show on the map after filtering.")
+        st.warning("No listings with valid geographic coordinates remain after filtering.")
 else:
-    st.warning("No PG listings to show on the map.")
+    st.warning("The data does not contain 'Latitude' or 'Longitude' columns to display the map.")
 
-# --- Analytics Section ---
+# --- Analytics Section (remains the same) ---
 st.markdown("### 📊 Analytics")
 
 col1, col2 = st.columns(2)
