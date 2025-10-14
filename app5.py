@@ -1099,7 +1099,7 @@ window.addEventListener('message', function(event) {
 """, height=0)
 
 # Add a hidden endpoint to receive geolocation data
-@st.experimental_memo
+@st.cache_data
 def handle_geolocation(data):
     st.session_state.geolocation_data = data
 
