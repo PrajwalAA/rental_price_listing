@@ -5,7 +5,6 @@ import folium
 from streamlit_folium import folium_static
 import plotly.express as px
 import random
-from streamlit.components.v1 import html
 from branca.element import Element
 
 # --- Load JSON data ---
@@ -14,10 +13,14 @@ with open("pg.json", "r") as f:
 
 df = pd.DataFrame(pg_data)
 
+# --- Handle possible missing columns ---
+df["Amenities"] = df.get("Amenities", []).fillna([]) if "Amenities" in df else [[] for _ in range(len(df))]
+df["Common Area"] = df.get("Common Area", []).fillna([]) if "Common Area" in df else [[] for _ in range(len(df))]
+
 # --- Page Configuration ---
 st.set_page_config(page_title="PG Finder Dashboard", layout="wide", initial_sidebar_state="expanded")
 
-# --- Custom CSS for Styling ---
+# --- Custom CSS ---
 st.markdown("""
 <style>
     .main-header {
@@ -30,7 +33,6 @@ st.markdown("""
         border-radius: 10px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
-    
     .pg-card {
         background-color: #f8fafc;
         border-left: 5px solid #3b82f6;
@@ -40,99 +42,24 @@ st.markdown("""
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         transition: all 0.3s ease;
     }
-    
     .pg-card:hover {
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         transform: translateY(-2px);
     }
-    
-    .pg-title {
-        font-size: 1.4rem;
-        font-weight: 600;
-        color: #1e40af;
-        margin-bottom: 0.5rem;
-    }
-    
-    .pg-rent {
-        font-size: 1.2rem;
-        font-weight: 700;
-        color: #047857;
-    }
-    
-    .pg-details {
-        margin-top: 1rem;
-        padding-top: 1rem;
-        border-top: 1px dashed #cbd5e1;
-    }
-    
-    .detail-row {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 0.5rem;
-    }
-    
-    .detail-label {
-        font-weight: 500;
-        color: #475569;
-    }
-    
-    .detail-value {
-        color: #1e293b;
-    }
-    
-    .amenities {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-        margin-top: 0.5rem;
-    }
-    
-    .amenity-tag {
-        background-color: #dbeafe;
-        color: #1d4ed8;
-        padding: 0.25rem 0.75rem;
-        border-radius: 9999px;
-        font-size: 0.875rem;
-    }
-    
-    .map-container {
-        height: 500px;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    
-    .chart-container {
-        background-color: #ffffff;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-        margin-bottom: 1.5rem;
-    }
-    
-    .filter-section {
-        background-color: #f1f5f9;
-        padding: 1.5rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-    }
-    
-    .filter-header {
-        font-size: 1.3rem;
-        font-weight: 600;
-        color: #1e293b;
-        margin-bottom: 1rem;
-    }
-    
-    .avg-rent-highlight {
-        color: #ef4444;
-        font-weight: 600;
-    }
-    
-    .below-avg-rent {
-        color: #3b82f6;
-        font-weight: 600;
-    }
+    .pg-title { font-size: 1.4rem; font-weight: 600; color: #1e40af; margin-bottom: 0.5rem; }
+    .pg-rent { font-size: 1.2rem; font-weight: 700; color: #047857; }
+    .pg-details { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #cbd5e1; }
+    .detail-row { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
+    .detail-label { font-weight: 500; color: #475569; }
+    .detail-value { color: #1e293b; }
+    .amenities { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem; }
+    .amenity-tag { background-color: #dbeafe; color: #1d4ed8; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.875rem; }
+    .map-container { height: 500px; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+    .chart-container { background-color: #ffffff; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); margin-bottom: 1.5rem; }
+    .filter-section { background-color: #f1f5f9; padding: 1.5rem; border-radius: 10px; margin-bottom: 2rem; }
+    .filter-header { font-size: 1.3rem; font-weight: 600; color: #1e293b; margin-bottom: 1rem; }
+    .avg-rent-highlight { color: #ef4444; font-weight: 600; }
+    .below-avg-rent { color: #3b82f6; font-weight: 600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -193,141 +120,75 @@ filtered_df = filtered_df[filtered_df["Rent Price"] <= rent_max]
 # --- Results Header ---
 st.markdown(f"### 🏠 Found {len(filtered_df)} PG Listings matching your criteria")
 
-# --- Calculate average rent for map highlighting ---
-avg_rent = filtered_df["Rent Price"].mean()
+# --- Average Rent ---
+avg_rent = filtered_df["Rent Price"].mean() if not filtered_df.empty else 0
 st.markdown(f"#### 💰 Average Rent: ₹{avg_rent:.2f}")
 
-# --- Listings Section with Collapsible Details ---
+# --- PG Listings ---
 st.markdown("### 📋 PG Listings")
 
 for idx, row in filtered_df.iterrows():
-    # Create a unique key for each expander
-    expander_key = f"pg_details_{idx}"
-    
-    # Determine if rent is above average for highlighting
     rent_class = "avg-rent-highlight" if row['Rent Price'] > avg_rent else "below-avg-rent"
-    
-    with st.expander(f"**{row['PG Name']}** - {row['Shearing']} | <span class='pg-rent {rent_class}'>₹{row['Rent Price']}</span>", expanded=False):
+    with st.expander(f"**{row['PG Name']}** - {row['Shearing']} | ₹{row['Rent Price']}", expanded=False):
         st.markdown(f"""
         <div class="pg-details">
-            <div class="detail-row">
-                <span class="detail-label">Listing Title:</span>
-                <span class="detail-value">{row['Listing Title']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Location:</span>
-                <span class="detail-value">{row['Area']}, {row['City']}, {row['Zone']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Best Suit For:</span>
-                <span class="detail-value">{row['Best Suit For']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Meals:</span>
-                <span class="detail-value">{row['Meals Available']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Notice Period:</span>
-                <span class="detail-value">{row['Notice Period']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Lock-in Period:</span>
-                <span class="detail-value">{row['Lock-in Period']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Non-Veg Allowed:</span>
-                <span class="detail-value">{row['Non-Veg Allowed']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Opposite Gender Allowed:</span>
-                <span class="detail-value">{row['Opposite Gender Allowed']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Visitors Allowed:</span>
-                <span class="detail-value">{row['Visitors Allowed']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Drinking Allowed:</span>
-                <span class="detail-value">{row['Drinking Allowed']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Smoking Allowed:</span>
-                <span class="detail-value">{row['Smoking Allowed']}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">Security Deposit:</span>
-                <span class="detail-value">₹{row['Security Deposit']}</span>
-            </div>
-            
+            <div class="detail-row"><span class="detail-label">Listing Title:</span><span class="detail-value">{row['Listing Title']}</span></div>
+            <div class="detail-row"><span class="detail-label">Location:</span><span class="detail-value">{row['Area']}, {row['City']}, {row['Zone']}</span></div>
+            <div class="detail-row"><span class="detail-label">Best Suit For:</span><span class="detail-value">{row['Best Suit For']}</span></div>
+            <div class="detail-row"><span class="detail-label">Meals:</span><span class="detail-value">{row['Meals Available']}</span></div>
+            <div class="detail-row"><span class="detail-label">Notice Period:</span><span class="detail-value">{row['Notice Period']}</span></div>
+            <div class="detail-row"><span class="detail-label">Lock-in Period:</span><span class="detail-value">{row['Lock-in Period']}</span></div>
+            <div class="detail-row"><span class="detail-label">Non-Veg Allowed:</span><span class="detail-value">{row['Non-Veg Allowed']}</span></div>
+            <div class="detail-row"><span class="detail-label">Opposite Gender Allowed:</span><span class="detail-value">{row['Opposite Gender Allowed']}</span></div>
+            <div class="detail-row"><span class="detail-label">Visitors Allowed:</span><span class="detail-value">{row['Visitors Allowed']}</span></div>
+            <div class="detail-row"><span class="detail-label">Drinking Allowed:</span><span class="detail-value">{row['Drinking Allowed']}</span></div>
+            <div class="detail-row"><span class="detail-label">Smoking Allowed:</span><span class="detail-value">{row['Smoking Allowed']}</span></div>
+            <div class="detail-row"><span class="detail-label">Security Deposit:</span><span class="detail-value">₹{row['Security Deposit']}</span></div>
+
             <div style="margin-top: 1rem;">
                 <span class="detail-label">Amenities:</span>
                 <div class="amenities">
-                    {"".join([f"<span class='amenity-tag'>{amenity}</span>" for amenity in row.get('Amenities', [])])}
+                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Amenities', [])])}
                 </div>
             </div>
-            
+
             <div style="margin-top: 1rem;">
                 <span class="detail-label">Common Areas:</span>
                 <div class="amenities">
-                    {"".join([f"<span class='amenity-tag'>{area}</span>" for area in row.get('Common Area', [])])}
+                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Common Area', [])])}
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
 
-# --- Map View with Average Rent Highlighting ---
+# --- Map View ---
 st.markdown("### 🗺️ Map View")
-filtered_df.loc[:, "Latitude"] = filtered_df.index.map(lambda x: 21.1458 + random.uniform(-0.01, 0.01))
-filtered_df.loc[:, "Longitude"] = filtered_df.index.map(lambda x: 79.0882 + random.uniform(-0.01, 0.01))
+if not filtered_df.empty:
+    filtered_df["Latitude"] = 21.1458 + (pd.Series(range(len(filtered_df))) * 0.001 % 0.02)
+    filtered_df["Longitude"] = 79.0882 + (pd.Series(range(len(filtered_df))) * 0.001 % 0.02)
 
-m = folium.Map(location=[21.1458, 79.0882], zoom_start=12)
+    m = folium.Map(location=[21.1458, 79.0882], zoom_start=12)
+    for _, row in filtered_df.iterrows():
+        color = 'red' if row['Rent Price'] > avg_rent else 'blue'
+        popup_html = f"<b>{row['PG Name']}</b><br>Rent: ₹{row['Rent Price']}<br>"
+        popup_html += "<span style='color:red;'>Above Average</span>" if row['Rent Price'] > avg_rent else "<span style='color:blue;'>Below Average</span>"
+        folium.Marker(
+            [row["Latitude"], row["Longitude"]],
+            popup=folium.Popup(popup_html, max_width=250),
+            tooltip=row["Area"],
+            icon=folium.Icon(color=color, icon='home')
+        ).add_to(m)
 
-# Add markers with color coding based on rent
-for idx, row in filtered_df.iterrows():
-    # Determine marker color based on rent
-    if row['Rent Price'] > avg_rent:
-        color = 'red'
-        icon_color = 'white'
-    else:
-        color = 'blue'
-        icon_color = 'white'
-    
-    # Create popup with rent comparison
-    popup_html = f"""
-    <b>{row['PG Name']}</b><br>
-    Shearing: {row['Shearing']}<br>
-    Rent: <b>₹{row['Rent Price']}</b><br>
-    Average: <b>₹{avg_rent:.2f}</b><br>
-    """
-    
-    if row['Rent Price'] > avg_rent:
-        popup_html += "<span style='color:red;'>Above Average</span>"
-    else:
-        popup_html += "<span style='color:blue;'>Below Average</span>"
-    
-    folium.Marker(
-        location=[row["Latitude"], row["Longitude"]],
-        popup=folium.Popup(popup_html, max_width=250),
-        tooltip=row["Area"],
-        icon=folium.Icon(color=color, icon_color=icon_color, icon='home')
-    ).add_to(m)
-
-# Add a legend to the map
-legend_html = '''
-     <div style="position: fixed; 
-                 top: 10px; right: 10px; width: 180px; height: 110px; 
-                 border:2px solid grey; z-index:9999; font-size:14px;
-                 background-color:white;
-                 ">&nbsp; <b>Rent Comparison</b> <br>
-                 &nbsp; <i class="fa fa-circle" style="color:red"></i> Above Average Rent <br>
-                 &nbsp; <i class="fa fa-circle" style="color:blue"></i> Below Average Rent <br>
-                 &nbsp; Average: ₹{:.2f}
-     </div>
-     '''.format(avg_rent)
-
-m.get_root().html.add_child(Element(legend_html))
-
-folium_static(m, width=700, height=500)
+    legend_html = f'''
+         <div style="position: fixed; top: 10px; right: 10px; width: 180px; height: 110px; 
+                     border:2px solid grey; z-index:9999; font-size:14px; background-color:white;">
+             &nbsp; <b>Rent Comparison</b> <br>
+             &nbsp; <i class="fa fa-circle" style="color:red"></i> Above Average <br>
+             &nbsp; <i class="fa fa-circle" style="color:blue"></i> Below Average <br>
+             &nbsp; Avg: ₹{avg_rent:.2f}
+         </div>'''
+    m.get_root().html.add_child(Element(legend_html))
+    folium_static(m, width=700, height=500)
 
 # --- Analytics Section ---
 st.markdown("### 📊 Analytics")
@@ -337,21 +198,9 @@ col1, col2 = st.columns(2)
 with col1:
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     if not filtered_df.empty:
-        avg_rent = filtered_df.groupby("Area")["Rent Price"].mean().reset_index()
-        fig1 = px.bar(
-            avg_rent, 
-            x="Area", 
-            y="Rent Price", 
-            title="Average Rent by Area",
-            color="Rent Price",
-            color_continuous_scale=px.colors.sequential.Blues
-        )
-        fig1.update_layout(
-            title_font_size=18,
-            xaxis_title="Area",
-            yaxis_title="Average Rent (₹)",
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
+        avg_rent_area = filtered_df.groupby("Area")["Rent Price"].mean().reset_index()
+        fig1 = px.bar(avg_rent_area, x="Area", y="Rent Price", title="Average Rent by Area", color="Rent Price", color_continuous_scale="Blues")
+        fig1.update_layout(title_font_size=18, xaxis_title="Area", yaxis_title="Average Rent (₹)", plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig1, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -360,14 +209,7 @@ with col2:
     if not filtered_df.empty:
         shearing_count = filtered_df["Shearing"].value_counts().reset_index()
         shearing_count.columns = ["Shearing", "Count"]
-        fig2 = px.pie(
-            shearing_count, 
-            names="Shearing", 
-            values="Count", 
-            title="Shearing Type Distribution",
-            hole=0.4,
-            color_discrete_sequence=px.colors.qualitative.G10
-        )
+        fig2 = px.pie(shearing_count, names="Shearing", values="Count", title="Shearing Type Distribution", hole=0.4)
         fig2.update_traces(textposition='inside', textinfo='percent+label')
         fig2.update_layout(title_font_size=18)
         st.plotly_chart(fig2, use_container_width=True)
@@ -380,20 +222,8 @@ with col3:
     if not filtered_df.empty:
         meals_count = filtered_df["Meals Available"].value_counts().reset_index()
         meals_count.columns = ["Meals", "Count"]
-        fig3 = px.bar(
-            meals_count, 
-            x="Meals", 
-            y="Count", 
-            title="Meals Availability",
-            color="Meals",
-            color_discrete_map={"Yes": "#4ade80", "No": "#f87171"}
-        )
-        fig3.update_layout(
-            title_font_size=18,
-            xaxis_title="Meals Available",
-            yaxis_title="Count",
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
+        fig3 = px.bar(meals_count, x="Meals", y="Count", title="Meals Availability", color="Meals", color_discrete_map={"Yes": "#4ade80", "No": "#f87171"})
+        fig3.update_layout(title_font_size=18, xaxis_title="Meals Available", yaxis_title="Count", plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig3, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -402,20 +232,8 @@ with col4:
     if not filtered_df.empty:
         gender_count = filtered_df["Opposite Gender Allowed"].value_counts().reset_index()
         gender_count.columns = ["Policy", "Count"]
-        fig4 = px.bar(
-            gender_count, 
-            x="Policy", 
-            y="Count", 
-            title="Opposite Gender Policy",
-            color="Policy",
-            color_discrete_map={"Yes": "#60a5fa", "No": "#fbbf24"}
-        )
-        fig4.update_layout(
-            title_font_size=18,
-            xaxis_title="Opposite Gender Allowed",
-            yaxis_title="Count",
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
+        fig4 = px.bar(gender_count, x="Policy", y="Count", title="Opposite Gender Policy", color="Policy", color_discrete_map={"Yes": "#60a5fa", "No": "#fbbf24"})
+        fig4.update_layout(title_font_size=18, xaxis_title="Opposite Gender Allowed", yaxis_title="Count", plot_bgcolor='rgba(0,0,0,0)')
         st.plotly_chart(fig4, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
