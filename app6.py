@@ -13,7 +13,8 @@ with open("pg.json", "r") as f:
 
 df = pd.DataFrame(pg_data)
 
-# --- Handle possible missing columns ---if "Amenities" in df:
+# --- Fix Amenities column safely ---
+if "Amenities" in df:
     df["Amenities"] = df["Amenities"].apply(lambda x: x if isinstance(x, list) else [])
 else:
     df["Amenities"] = [[] for _ in range(len(df))]
