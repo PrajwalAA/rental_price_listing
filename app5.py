@@ -629,107 +629,214 @@ def main():
     
     # Advanced Search Mode
     elif search_mode == "Advanced Search":
-        st.sidebar.subheader("Advanced Filters")
+        # Display current property count
+        st.sidebar.markdown(f"📊 Showing all {len(st.session_state.filtered_properties)} properties")
         
-        # Size (sqft)
-        st.sidebar.subheader("1. Size (sqft)")
+        st.sidebar.subheader("Search Options:")
+        
+        # 1. Size (sqft)
+        st.sidebar.markdown("1. **Size (sqft)**")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            min_size = st.number_input("Min Size", min_value=0, value=0, key="min_size")
+            min_size = st.number_input("Min", min_value=0, value=0, key="min_size")
         with col2:
-            max_size = st.number_input("Max Size", min_value=0, value=10000, key="max_size")
+            max_size = st.number_input("Max", min_value=0, value=10000, key="max_size")
         
-        # Carpet Area (sqft)
-        st.sidebar.subheader("2. Carpet Area (sqft)")
+        # 2. Carpet Area (sqft)
+        st.sidebar.markdown("2. **Carpet Area (sqft)**")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            min_carpet = st.number_input("Min Carpet", min_value=0, value=0, key="min_carpet")
+            min_carpet = st.number_input("Min", min_value=0, value=0, key="min_carpet")
         with col2:
-            max_carpet = st.number_input("Max Carpet", min_value=0, value=10000, key="max_carpet")
+            max_carpet = st.number_input("Max", min_value=0, value=10000, key="max_carpet")
         
-        # Age of Property
-        st.sidebar.subheader("3. Age of Property")
+        # 3. Age of Property
+        st.sidebar.markdown("3. **Age of Property**")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            min_age = st.number_input("Min Age", min_value=0, value=0, key="min_age")
+            min_age = st.number_input("Min", min_value=0, value=0, key="min_age")
         with col2:
-            max_age = st.number_input("Max Age", min_value=0, value=50, key="max_age")
+            max_age = st.number_input("Max", min_value=0, value=50, key="max_age")
         
-        # Brokerage
-        st.sidebar.subheader("4. Brokerage")
-        brokerage = st.sidebar.selectbox("Brokerage", ["Any", "Yes", "No"], key="brokerage")
+        # 4. Brokerage
+        st.sidebar.markdown("4. **Brokerage**")
+        brokerage = st.sidebar.selectbox("Select", ["Any", "Yes", "No"], key="brokerage")
         
-        # Property ID
-        st.sidebar.subheader("5. Property ID")
-        property_id = st.sidebar.text_input("Property ID", key="property_id")
+        # 5. Property ID
+        st.sidebar.markdown("5. **Property ID**")
+        property_id = st.sidebar.text_input("Enter ID", key="property_id")
         
-        # Furnishing
-        st.sidebar.subheader("6. Furnishing")
-        furnishing = st.sidebar.selectbox("Furnishing", ["Any", "Furnished", "Unfurnished"], key="furnishing")
+        # 6. Furnishing
+        st.sidebar.markdown("6. **Furnishing**")
+        furnishing = st.sidebar.selectbox("Select", ["Any", "Furnished", "Unfurnished"], key="furnishing")
         
-        # Security Deposit
-        st.sidebar.subheader("7. Security Deposit")
+        # 7. Security Deposit
+        st.sidebar.markdown("7. **Security Deposit**")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            min_deposit = st.number_input("Min Deposit", min_value=0, value=0, key="min_deposit")
+            min_deposit = st.number_input("Min", min_value=0, value=0, key="min_deposit")
         with col2:
-            max_deposit = st.number_input("Max Deposit", min_value=0, value=1000000, key="max_deposit")
+            max_deposit = st.number_input("Max", min_value=0, value=1000000, key="max_deposit")
         
-        # Rent Price
-        st.sidebar.subheader("8. Rent Price")
+        # 8. Rent Price
+        st.sidebar.markdown("8. **Rent Price**")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            min_rent = st.number_input("Min Rent", min_value=0, value=0, key="min_rent")
+            min_rent = st.number_input("Min", min_value=0, value=0, key="min_rent")
         with col2:
-            max_rent = st.number_input("Max Rent", min_value=0, value=100000, key="max_rent")
+            max_rent = st.number_input("Max", min_value=0, value=100000, key="max_rent")
         
-        # Area
-        st.sidebar.subheader("9. Area")
-        area = st.sidebar.selectbox("Area", ["Any"] + areas, key="area")
+        # 9. Area
+        st.sidebar.markdown("9. **Area**")
+        area = st.sidebar.selectbox("Select", ["Any"] + areas, key="area")
         
-        # Zone
-        st.sidebar.subheader("10. Zone")
-        zone = st.sidebar.selectbox("Zone", ["Any"] + zones, key="zone")
+        # 10. Zone
+        st.sidebar.markdown("10. **Zone**")
+        zone = st.sidebar.selectbox("Select", ["Any"] + zones, key="zone")
         
-        # Floor Number
-        st.sidebar.subheader("11. Floor Number")
-        floor_no = st.sidebar.selectbox("Floor Number", ["Any"] + floor_nos, key="floor_no")
+        # 11. Floor Number
+        st.sidebar.markdown("11. **Floor Number**")
+        floor_no = st.sidebar.selectbox("Select", ["Any"] + floor_nos, key="floor_no")
         
-        # Total Floors
-        st.sidebar.subheader("12. Total Floors")
+        # 12. Total Floors
+        st.sidebar.markdown("12. **Total Floors**")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            min_total_floors = st.number_input("Min Floors", min_value=0, value=0, key="min_total_floors")
+            min_total_floors = st.number_input("Min", min_value=0, value=0, key="min_total_floors")
         with col2:
-            max_total_floors = st.number_input("Max Floors", min_value=0, value=100, key="max_total_floors")
+            max_total_floors = st.number_input("Max", min_value=0, value=100, key="max_total_floors")
         
-        # Property Type
-        st.sidebar.subheader("13. Property Type")
-        property_type = st.sidebar.selectbox("Property Type", ["Any"] + property_types, key="property_type")
+        # 13. Property Type
+        st.sidebar.markdown("13. **Property Type**")
+        property_type = st.sidebar.selectbox("Select", ["Any"] + property_types, key="property_type")
         
-        # Ownership
-        st.sidebar.subheader("14. Ownership")
-        ownership = st.sidebar.selectbox("Ownership", ["Any"] + ownerships, key="ownership")
+        # 14. Ownership
+        st.sidebar.markdown("14. **Ownership**")
+        ownership = st.sidebar.selectbox("Select", ["Any"] + ownerships, key="ownership")
         
-        # Possession Status
-        st.sidebar.subheader("15. Possession Status")
-        possession_status = st.sidebar.selectbox("Possession Status", ["Any"] + possession_statuses, key="possession_status")
+        # 15. Possession Status
+        st.sidebar.markdown("15. **Possession Status**")
+        possession_status = st.sidebar.selectbox("Select", ["Any"] + possession_statuses, key="possession_status")
         
-        # Location Hub
-        st.sidebar.subheader("16. Location Hub")
-        location_hub = st.sidebar.selectbox("Location Hub", ["Any"] + location_hubs, key="location_hub")
+        # 16. Location Hub
+        st.sidebar.markdown("16. **Location Hub**")
+        location_hub = st.sidebar.selectbox("Select", ["Any"] + location_hubs, key="location_hub")
         
-        # Facilities
-        st.sidebar.subheader("17. Facilities")
-        selected_facilities = st.sidebar.multiselect("Select Facilities", facilities, key="facilities")
+        # 17. Facilities
+        st.sidebar.markdown("17. **Facilities**")
+        selected_facilities = st.sidebar.multiselect("Select", facilities, key="facilities")
         
-        # Lock-in Period
-        st.sidebar.subheader("18. Lock-in Period")
+        # 18. Lock-in Period
+        st.sidebar.markdown("18. **Lock-in Period**")
         col1, col2 = st.sidebar.columns(2)
         with col1:
-            min_lock_in = st.number_input("Min Period (months)", min_value=0, value=0, key="min_lock_in")
+            min_lock_in = st.number_input("Min (months)", min_value=0, value=0, key="min_lock_in")
         with col2:
-            max_lock_in = st.number_input("Max Period (months)", min_value=0, value=60, key="max_lock_in")
+            max_lock_in = st.number_input("Max (months)", min_value=0, value=60, key="max_lock_in")
+        
+        # Action buttons
+        st.sidebar.markdown("---")
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            if st.button("R. Reset all filters"):
+                st.session_state.filters = {}
+                st.session_state.filtered_properties = properties_data
+                st.rerun()
+        with col2:
+            if st.button("V. View current properties"):
+                # Build filters dictionary
+                filters = {}
+                
+                # Size filters
+                if min_size > 0:
+                    filters["min_size"] = min_size
+                if max_size > 0:
+                    filters["max_size"] = max_size
+                
+                # Carpet area filters
+                if min_carpet > 0:
+                    filters["min_carpet_area"] = min_carpet
+                if max_carpet > 0:
+                    filters["max_carpet_area"] = max_carpet
+                
+                # Age filters
+                if min_age > 0:
+                    filters["min_age"] = min_age
+                if max_age > 0:
+                    filters["max_age"] = max_age
+                
+                # Brokerage filter
+                if brokerage != "Any":
+                    filters["brokerage"] = brokerage.lower()
+                
+                # Property ID filter
+                if property_id:
+                    filters["property_id"] = property_id
+                
+                # Furnishing filter
+                if furnishing != "Any":
+                    filters["furnishing"] = furnishing.lower()
+                
+                # Security deposit filters
+                if min_deposit > 0:
+                    filters["min_security_deposit"] = min_deposit
+                if max_deposit > 0:
+                    filters["max_security_deposit"] = max_deposit
+                
+                # Rent filters
+                if min_rent > 0:
+                    filters["min_rent"] = min_rent
+                if max_rent > 0:
+                    filters["max_rent"] = max_rent
+                
+                # Area filter
+                if area != "Any":
+                    filters["area"] = area
+                
+                # Zone filter
+                if zone != "Any":
+                    filters["zone"] = zone
+                
+                # Floor number filter
+                if floor_no != "Any":
+                    filters["floor_no"] = floor_no
+                
+                # Total floors filters
+                if min_total_floors > 0:
+                    filters["min_total_floors"] = min_total_floors
+                if max_total_floors > 0:
+                    filters["max_total_floors"] = max_total_floors
+                
+                # Property type filter
+                if property_type != "Any":
+                    filters["property_type"] = property_type
+                
+                # Ownership filter
+                if ownership != "Any":
+                    filters["ownership"] = ownership
+                
+                # Possession status filter
+                if possession_status != "Any":
+                    filters["possession_status"] = possession_status
+                
+                # Location hub filter
+                if location_hub != "Any":
+                    filters["location_hub"] = location_hub
+                
+                # Facilities filter
+                if selected_facilities:
+                    filters["facilities"] = selected_facilities
+                
+                # Lock-in period filters
+                if min_lock_in > 0:
+                    filters["min_lock_in_period"] = min_lock_in
+                if max_lock_in > 0:
+                    filters["max_lock_in_period"] = max_lock_in
+                
+                # Apply filters
+                st.session_state.filters = filters
+                st.session_state.filtered_properties = filter_properties(properties_data, filters)
+                st.rerun()
     
     # Compare Properties Mode
     else:  # Compare Properties
@@ -741,120 +848,27 @@ def main():
         if property_ids:
             st.session_state.filters["compare"] = property_ids
     
-    # Apply filters button
-    if st.sidebar.button("Apply Filters", type="primary"):
-        # Build filters dictionary
-        filters = {}
-        
-        # Simple Search filters
-        if search_mode == "Simple Search":
-            # Filters are already set in the session state
-            filters = st.session_state.filters.copy()
-        
-        # Advanced Search filters
-        elif search_mode == "Advanced Search":
-            # Size filters
-            if min_size > 0:
-                filters["min_size"] = min_size
-            if max_size > 0:
-                filters["max_size"] = max_size
+    # Apply filters button (for non-advanced search modes)
+    if search_mode != "Advanced Search":
+        if st.sidebar.button("Apply Filters", type="primary"):
+            # Build filters dictionary
+            filters = {}
             
-            # Carpet area filters
-            if min_carpet > 0:
-                filters["min_carpet_area"] = min_carpet
-            if max_carpet > 0:
-                filters["max_carpet_area"] = max_carpet
+            # Simple Search filters
+            if search_mode == "Simple Search":
+                # Filters are already set in the session state
+                filters = st.session_state.filters.copy()
             
-            # Age filters
-            if min_age > 0:
-                filters["min_age"] = min_age
-            if max_age > 0:
-                filters["max_age"] = max_age
-            
-            # Brokerage filter
-            if brokerage != "Any":
-                filters["brokerage"] = brokerage.lower()
-            
-            # Property ID filter
-            if property_id:
-                filters["property_id"] = property_id
-            
-            # Furnishing filter
-            if furnishing != "Any":
-                filters["furnishing"] = furnishing.lower()
-            
-            # Security deposit filters
-            if min_deposit > 0:
-                filters["min_security_deposit"] = min_deposit
-            if max_deposit > 0:
-                filters["max_security_deposit"] = max_deposit
-            
-            # Rent filters
-            if min_rent > 0:
-                filters["min_rent"] = min_rent
-            if max_rent > 0:
-                filters["max_rent"] = max_rent
-            
-            # Area filter
-            if area != "Any":
-                filters["area"] = area
-            
-            # Zone filter
-            if zone != "Any":
-                filters["zone"] = zone
-            
-            # Floor number filter
-            if floor_no != "Any":
-                filters["floor_no"] = floor_no
-            
-            # Total floors filters
-            if min_total_floors > 0:
-                filters["min_total_floors"] = min_total_floors
-            if max_total_floors > 0:
-                filters["max_total_floors"] = max_total_floors
-            
-            # Property type filter
-            if property_type != "Any":
-                filters["property_type"] = property_type
-            
-            # Ownership filter
-            if ownership != "Any":
-                filters["ownership"] = ownership
-            
-            # Possession status filter
-            if possession_status != "Any":
-                filters["possession_status"] = possession_status
-            
-            # Location hub filter
-            if location_hub != "Any":
-                filters["location_hub"] = location_hub
-            
-            # Facilities filter
-            if selected_facilities:
-                filters["facilities"] = selected_facilities
-            
-            # Lock-in period filters
-            if min_lock_in > 0:
-                filters["min_lock_in_period"] = min_lock_in
-            if max_lock_in > 0:
-                filters["max_lock_in_period"] = max_lock_in
-        
-        # Apply filters
-        st.session_state.filters = filters
-        if search_mode == "Compare Properties" and "compare" in filters:
-            # For comparison mode, we don't filter the properties
-            st.session_state.filtered_properties = properties_data
-        else:
-            st.session_state.filtered_properties = filter_properties(properties_data, filters)
-    
-    # Reset filters button
-    if st.sidebar.button("Reset Filters"):
-        st.session_state.filters = {}
-        st.session_state.filtered_properties = properties_data
-        st.rerun()
+            # Apply filters
+            st.session_state.filters = filters
+            if search_mode == "Compare Properties" and "compare" in filters:
+                # For comparison mode, we don't filter the properties
+                st.session_state.filtered_properties = properties_data
+            else:
+                st.session_state.filtered_properties = filter_properties(properties_data, filters)
     
     # Display current filters
-    if st.session_state.filters:
+    if st.session_state.filters and search_mode != "Advanced Search":
         st.sidebar.subheader("Active Filters")
         for filter_type, value in st.session_state.filters.items():
             if filter_type in ["min_rent", "max_rent", "min_size", "max_size", 
