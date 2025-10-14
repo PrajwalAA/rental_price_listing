@@ -7,10 +7,6 @@ from streamlit_folium import folium_static
 import plotly.express as px
 import random
 from branca.element import Element
-from geopy.geocoders import Nominatim
-from geopy.extra.rate_limiter import RateLimiter
-import time
-import os
 
 # --- Load JSON data ---
 try:
@@ -47,43 +43,11 @@ for col in required_columns:
     if col not in df.columns:
         df[col] = "" if col != "Rent Price" else 0
 
-# --- Ensure location columns exist ---
-if "Latitude" not in df.columns:
-    df["Latitude"] = None
-if "Longitude" not in df.columns:
-    df["Longitude"] = None
 
-# --- Geocoding Function ---
-@st.cache_data(show_spinner=False)
-def geocode_addresses(addresses):
-    geolocator = Nominatim(user_agent="pg_finder_app")
-    geocode = RateLimiter(geolocator.geocode, min_delay_seconds=1)
-    
-    results = []
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    
-    for i, address in enumerate(addresses):
-        status_text.text(f"Geocoding address {i+1}/{len(addresses)}: {address}")
-        try:
-            location = geocode(address)
-            if location:
-                results.append((location.latitude, location.longitude))
-            else:
-                results.append((None, None))
-        except Exception as e:
-            st.warning(f"Error geocoding {address}: {str(e)}")
-            results.append((None, None))
-        
-        progress_bar.progress((i + 1) / len(addresses))
-        time.sleep(0.1)  # Small delay to avoid overwhelming the service
-    
-    status_text.text("Geocoding complete!")
-    time.sleep(1)
-    progress_bar.empty()
-    status_text.empty()
-    
-    return results
+
+
+
+
 
 # --- Page Configuration ---
 st.set_page_config(page_title="PG Finder Dashboard", layout="wide", initial_sidebar_state="expanded")
@@ -128,18 +92,6 @@ st.markdown("""
     .filter-header { font-size: 1.3rem; font-weight: 600; color: #1e293b; margin-bottom: 1rem; }
     .avg-rent-highlight { color: #ef4444; font-weight: 600; }
     .below-avg-rent { color: #3b82f6; font-weight: 600; }
-    .geocode-button {
-        background-color: #4CAF50;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 5px;
-        text-align: center;
-        text-decoration: none;
-        display: inline-block;
-        font-size: 16px;
-        margin: 4px 2px;
-        cursor: pointer;
-    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -219,14 +171,14 @@ else:
                 amenities_html = "<div class='amenities'>" + \
                                 "".join([f"<span class='amenity-tag'>{amenity}</span>" for amenity in row['Amenities']]) + \
                                 "</div>"
-            
+
             # Create common area display
             common_area_html = ""
             if row['Common Area']:
                 common_area_html = "<div class='amenities'>" + \
                                   "".join([f"<span class='amenity-tag'>{area}</span>" for area in row['Common Area']]) + \
                                   "</div>"
-            
+
             st.markdown(f"""
             <div class="pg-details">
                 <div class="detail-row"><span class="detail-label">Listing Title:</span><span class="detail-value">{row['Listing Title']}</span></div>
@@ -249,81 +201,49 @@ else:
             """, unsafe_allow_html=True)
 
 # --- Map View ---
+# --- Map View ---
+# --- Map View ---
 st.markdown("### 🗺️ Map View")
+if not filtered_df.empty:
+    # Check if Latitude & Longitude exist
+    if "Latitude" in filtered_df.columns and "Longitude" in filtered_df.columns:
+        # Convert coordinates to numeric and handle missing values
+        filtered_df["Latitude"] = pd.to_numeric(filtered_df["Latitude"], errors="coerce")
+        filtered_df["Longitude"] = pd.to_numeric(filtered_df["Longitude"], errors="coerce")
+        
+        # Filter out rows with invalid coordinates
 
-if filtered_df.empty:
-    st.warning("No PG listings to show on the map.")
-else:
-    # Check if we have location data
-    has_location_data = ("Latitude" in filtered_df.columns and "Longitude" in filtered_df.columns and 
-                         not filtered_df["Latitude"].isna().all() and not filtered_df["Longitude"].isna().all())
-    
-    if not has_location_data:
-        st.warning("Location data (Latitude/Longitude) not available for the PG listings.")
-        
-        # Create addresses for geocoding
-        addresses = []
-        for _, row in filtered_df.iterrows():
-            address_parts = [row['Area'], row['City'], row['Zone']]
-            # Filter out empty parts
-            address_parts = [part for part in address_parts if pd.notna(part) and part != ""]
-            if address_parts:
-                addresses.append(", ".join(address_parts) + ", India")
-            else:
-                addresses.append(None)
-        
-        # Remove None addresses
-        valid_addresses = [addr for addr in addresses if addr is not None]
-        
-        if valid_addresses:
-            st.write(f"Found {len(valid_addresses)} addresses to geocode.")
-            
-            if st.button("🔍 Geocode Addresses to Show on Map", key="geocode_btn"):
-                with st.spinner("Geocoding addresses... This may take a while."):
-                    # Geocode the addresses
-                    coords = geocode_addresses(valid_addresses)
-                    
-                    # Update the dataframe with coordinates
-                    coord_index = 0
-                    for i, addr in enumerate(addresses):
-                        if addr is not None:
-                            filtered_df.at[filtered_df.index[i], 'Latitude'] = coords[coord_index][0]
-                            filtered_df.at[filtered_df.index[i], 'Longitude'] = coords[coord_index][1]
-                            coord_index += 1
-                    
-                    # Update the original dataframe as well for future use
-                    for i, addr in enumerate(addresses):
-                        if addr is not None:
-                            df.at[filtered_df.index[i], 'Latitude'] = coords[coord_index][0]
-                            df.at[filtered_df.index[i], 'Longitude'] = coords[coord_index][1]
-                            coord_index += 1
-                    
-                    st.success("Geocoding completed! Now displaying the map.")
-                    has_location_data = True
-        else:
-            st.error("No valid addresses found for geocoding.")
-    
-    if has_location_data:
-        # Calculate map center using valid coordinates
+
+
+
         valid_coords = filtered_df.dropna(subset=["Latitude", "Longitude"])
+        
         if not valid_coords.empty:
             map_center = [valid_coords["Latitude"].mean(), valid_coords["Longitude"].mean()]
         else:
-            map_center = [21.1458, 79.0882]  # Default center (Nagpur, India)
-        
-        # Create map
-        m = folium.Map(location=map_center, zoom_start=12)
-        
-        # Create feature groups for better organization
-        above_avg_group = folium.FeatureGroup(name='Above Average Rent')
-        below_avg_group = folium.FeatureGroup(name='Below Average Rent')
-        
-        # Add markers for each PG
-        for _, row in filtered_df.iterrows():
-            # Only add markers if coordinates are available
-            if pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
-                lat, lon = row["Latitude"], row["Longitude"]
-                
+            map_center = [21.1458, 79.0882]  # Default center
+            st.warning("No valid coordinates found. Using default location.")
+    else:
+        map_center = [21.1458, 79.0882]  # Default center
+        st.warning("Latitude and Longitude columns not found in data. Using default location.")
+
+    # Create map
+    m = folium.Map(location=map_center, zoom_start=12)
+    
+    # Create feature groups for better organization
+    above_avg_group = folium.FeatureGroup(name='Above Average Rent')
+    below_avg_group = folium.FeatureGroup(name='Below Average Rent')
+    
+    # Track markers added
+    markers_added = 0
+    
+    for _, row in filtered_df.iterrows():
+        # Only add markers if coordinates are available and valid
+        if "Latitude" in row and "Longitude" in row and pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
+            try:
+                lat = float(row["Latitude"])
+                lon = float(row["Longitude"])
+
                 # Create detailed popup HTML
                 popup_html = f"""
                 <div style="font-family: Arial; max-width: 250px;">
@@ -341,10 +261,10 @@ else:
                     </p>
                 </div>
                 """
-                
+
                 # Create tooltip
                 tooltip_text = f"{row['PG Name']} - ₹{row['Rent Price']}"
-                
+
                 # Determine marker color and icon
                 if row['Rent Price'] > avg_rent:
                     color = 'red'
@@ -354,83 +274,122 @@ else:
                     color = 'blue'
                     icon = 'fa-check-circle'
                     group = below_avg_group
-                
+
                 # Create marker with custom icon
                 folium.Marker(
-                    [lat, lon],
+                    location=[lat, lon],
                     popup=folium.Popup(popup_html, max_width=300),
                     tooltip=tooltip_text,
                     icon=folium.Icon(color=color, icon=icon, prefix='fa')
                 ).add_to(group)
-        
-        # Add feature groups to map
-        above_avg_group.add_to(m)
-        below_avg_group.add_to(m)
-        
-        # Add layer control
-        folium.LayerControl().add_to(m)
-        
-        # Add legend
-        legend_html = f'''
-        <div style="position: fixed; 
-                    bottom: 50px; 
-                    left: 50px; 
-                    width: 200px; 
-                    height: 160px; 
-                    background-color:white;
-                    border:2px solid grey;
-                    z-index:9999; 
-                    font-size:14px;
-                    padding: 10px;
-                    border-radius: 5px;
-                    box-shadow: 0 0 15px rgba(0,0,0,0.2);">
-            <p style="margin: 0 0 10px 0; font-weight: bold;">Rent Legend</p>
-            <p style="margin: 5px 0;">
-                <i class="fa fa-exclamation-circle" style="color:red"></i> 
-                Above Average Rent
-            </p>
-            <p style="margin: 5px 0;">
-                <i class="fa fa-check-circle" style="color:blue"></i> 
-                Below Average Rent
-            </p>
-            <p style="margin: 10px 0 5px 0; font-weight: bold;">Average Rent: ₹{avg_rent:.2f}</p>
-            <p style="margin: 5px 0 0 0; font-size: 12px; color: #666;">
-                Total PGs: {len(filtered_df)}
-            </p>
-        </div>'''
-        m.get_root().html.add_child(Element(legend_html))
-        
-        # Add fullscreen button
-        plugins.Fullscreen(position='topright').add_to(m)
-        
-        # Add measure control
-        plugins.MeasureControl(position='bottomright').add_to(m)
-        
-        # Add cluster markers for better visualization when there are many points
-        marker_cluster = plugins.MarkerCluster().add_to(m)
-        
-        # Add markers to cluster
-        for _, row in filtered_df.iterrows():
-            if pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
-                lat, lon = row["Latitude"], row["Longitude"]
-                
-                # Determine marker color
-                if row['Rent Price'] > avg_rent:
-                    color = 'red'
-                else:
-                    color = 'blue'
-                
-                # Create marker
-                folium.Marker(
-                    [lat, lon],
-                    popup=f"<b>{row['PG Name']}</b><br>Rent: ₹{row['Rent Price']}",
-                    tooltip=row['PG Name'],
-                    icon=folium.Icon(color=color, icon='home', prefix='fa')
-                ).add_to(marker_cluster)
-        
-        # Display the map
-        folium_static(m, width='100%', height=600)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                markers_added += 1
+            except Exception as e:
+                st.warning(f"Error adding marker for {row['PG Name']}: {str(e)}")
+    
+    # Add feature groups to map
+    above_avg_group.add_to(m)
+    below_avg_group.add_to(m)
+    
+    # Add layer control
+    folium.LayerControl().add_to(m)
+    
+    # Add legend
+    legend_html = f'''
+    <div style="position: fixed; 
+                bottom: 50px; 
+                left: 50px; 
+                width: 200px; 
+                height: 140px; 
+                background-color:white;
+                border:2px solid grey;
+                z-index:9999; 
+                font-size:14px;
+                padding: 10px;
+                border-radius: 5px;
+                box-shadow: 0 0 15px rgba(0,0,0,0.2);">
+        <p style="margin: 0 0 10px 0; font-weight: bold;">Rent Legend</p>
+        <p style="margin: 5px 0;">
+            <i class="fa fa-exclamation-circle" style="color:red"></i> 
+            Above Average (₹{avg_rent:.2f})
+        </p>
+        <p style="margin: 5px 0;">
+            <i class="fa fa-check-circle" style="color:blue"></i> 
+            Below Average (₹{avg_rent:.2f})
+        </p>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
+            Total PGs: {markers_added}
+        </p>
+    </div>'''
+    m.get_root().html.add_child(Element(legend_html))
+    
+    # Add fullscreen button
+    plugins.Fullscreen(position='topright').add_to(m)
+    
+    # Add measure control
+    plugins.MeasureControl(position='bottomright').add_to(m)
+    
+    # Display the map
+    folium_static(m, width='100%', height=600)
+    
+    # Show debug information
+    if markers_added == 0:
+        st.error("No markers were added to the map. Please check your coordinate data.")
+    else:
+        st.success(f"Successfully added {markers_added} markers to the map.")
+else:
+    st.warning("No PG listings to show on the map.")
 # --- Analytics Section ---
 st.markdown("### 📊 Analytics")
 
