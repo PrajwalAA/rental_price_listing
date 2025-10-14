@@ -153,19 +153,7 @@ for idx, row in filtered_df.iterrows():
             <div class="detail-row"><span class="detail-label">Smoking Allowed:</span><span class="detail-value">{row['Smoking Allowed']}</span></div>
             <div class="detail-row"><span class="detail-label">Security Deposit:</span><span class="detail-value">₹{row['Security Deposit']}</span></div>
     
-            <div style="margin-top: 1rem;">
-                <span class="detail-label">Amenities:</span>
-                <div class="amenities">
-                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Amenities', [])])}
-                </div>
-            </div>
-    
-            <div style="margin-top: 1rem;">
-                <span class="detail-label">Common Areas:</span>
-                <div class="amenities">
-                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Common Area', [])])}
-                </div>
-            </div>
+            
         </div>
         """, unsafe_allow_html=True)
 
