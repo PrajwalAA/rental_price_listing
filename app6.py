@@ -6,7 +6,7 @@ from streamlit_folium import folium_static
 import plotly.express as px
 
 # --- Load JSON data ---
-with open("pg_listings.json", "r") as f:
+with open("PG.json", "r") as f:
     pg_data = json.load(f)
 
 # Convert JSON to DataFrame for analytics
