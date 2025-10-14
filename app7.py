@@ -1060,7 +1060,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply Filters", type="primary"):
+                if st.button("🔍 Apply Main Filters", type="primary"):
                     st.session_state.apply_residential_filters = True
             with col2:
                 if st.button("🔄 Reset"):
@@ -1127,7 +1127,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply Filters", type="primary"):
+                if st.button("🔍 Apply Sidebar Filters", type="primary"):
                     st.session_state.apply_residential_filters = True
             with col2:
                 if st.button("🔄 Reset"):
@@ -1397,7 +1397,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply Filters", type="primary"):
+                if st.button("🔍 Apply MAIN Filters", type="primary"):
                     st.session_state.apply_commercial_filters = True
             with col2:
                 if st.button("🔄 Reset"):
@@ -1466,7 +1466,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply Filters", type="primary"):
+                if st.button("🔍 Apply SLIDEBAR Filters", type="primary"):
                     # Build filters dictionary
                     filters = {}
                     
