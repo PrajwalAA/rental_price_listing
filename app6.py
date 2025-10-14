@@ -18,7 +18,12 @@ if "Amenities" in df:
     df["Amenities"] = df["Amenities"].apply(lambda x: x if isinstance(x, list) else [])
 else:
     df["Amenities"] = [[] for _ in range(len(df))]
-df["Common Area"] = df.get("Common Area", []).fillna([]) if "Common Area" in df else [[] for _ in range(len(df))]
+
+if "Common Area" in df:
+    df["Common Area"] = df["Common Area"].apply(lambda x: x if isinstance(x, list) else [])
+else:
+    df["Common Area"] = [[] for _ in range(len(df))]
+
 
 # --- Page Configuration ---
 st.set_page_config(page_title="PG Finder Dashboard", layout="wide", initial_sidebar_state="expanded")
