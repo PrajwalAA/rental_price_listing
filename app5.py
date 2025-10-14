@@ -16,7 +16,7 @@ st.set_page_config(
     page_title="Commercial Property Search - Nagpur",
     page_icon="🏢",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"  # Changed to collapsed since we're not using sidebar
 )
 
 # --- Load properties from JSON file ---
@@ -511,415 +511,394 @@ def main():
     facilities = get_all_facilities(properties_data)
     floors = get_all_floors(properties_data)
     
-    # Sidebar for filters
-    st.sidebar.header("🔍 Search Filters")
-    
-    # Add Nagpur city badge
-    st.sidebar.markdown("### 🔍 Search in Nagpur City")
-    st.sidebar.info("All search results are limited to properties within Nagpur city limits.")
+    # Add Nagpur city badge at the top
+    st.markdown("### 🔍 Search in Nagpur City")
+    st.info("All search results are limited to properties within Nagpur city limits.")
     
     # User location section
-    st.sidebar.subheader("📍 Your Location")
-    location_method = st.sidebar.radio(
-        "Select location method",
-        ["Enter Manually", "Use Current Location"]
-    )
+    st.subheader("📍 Your Location")
+    col1, col2 = st.columns(2)
     
-    if location_method == "Enter Manually":
-        lat = st.sidebar.number_input("Latitude", value=21.1458, format="%.6f")
-        lon = st.sidebar.number_input("Longitude", value=79.0882, format="%.6f")
-        if st.sidebar.button("Set Location"):
-            st.session_state.user_location = (lat, lon)
-            st.sidebar.success("Location set successfully!")
-    else:
-        if st.sidebar.button("Get My Current Location"):
-            # Get user's current location using browser geolocation
-            js_code = """
-            navigator.geolocation.getCurrentPosition(
-                (position) => {
-                    window.parent.postMessage({
-                        type: 'geolocation',
-                        data: {
-                            latitude: position.coords.latitude,
-                            longitude: position.coords.longitude
-                        }
-                    }, '*');
-                },
-                (error) => {
-                    window.parent.postMessage({
-                        type: 'geolocation',
-                        data: null
-                    }, '*');
-                }
-            );
-            """
-            
-            # Display the JavaScript code in a hidden component
-            st.components.v1.html(f"""
-            <script>
-            {js_code}
-            </script>
-            """, height=0)
-            
-            # Wait for the message from the JavaScript
-            if 'geolocation_data' not in st.session_state:
-                st.session_state.geolocation_data = None
-            
-            # Check if we received geolocation data
-            if st.session_state.geolocation_data:
-                lat, lon = st.session_state.geolocation_data
+    with col1:
+        location_method = st.radio(
+            "Select location method",
+            ["Enter Manually", "Use Current Location"]
+        )
+    
+    with col2:
+        if location_method == "Enter Manually":
+            lat_col, lon_col = st.columns(2)
+            with lat_col:
+                lat = st.number_input("Latitude", value=21.1458, format="%.6f")
+            with lon_col:
+                lon = st.number_input("Longitude", value=79.0882, format="%.6f")
+            if st.button("Set Location"):
                 st.session_state.user_location = (lat, lon)
-                st.sidebar.success("Current location detected successfully!")
-            else:
-                st.warning("Unable to detect your location. Please enable location access or enter manually.")
-                # Use default Nagpur location as fallback
+                st.success("Location set successfully!")
+        else:
+            if st.button("Get My Current Location"):
+                # This is a placeholder - in a real app, you would use browser geolocation
+                # For demo purposes, we'll use a default location in Nagpur
                 st.session_state.user_location = (21.1458, 79.0882)
+                st.success("Using default Nagpur location. In a real app, this would get your current location.")
     
     # Display current user location if set
     if st.session_state.user_location:
-        st.sidebar.info(f"Your location: {st.session_state.user_location[0]:.6f}, {st.session_state.user_location[1]:.6f}")
+        st.info(f"Your location: {st.session_state.user_location[0]:.6f}, {st.session_state.user_location[1]:.6f}")
     
-    # Search mode selection
-    search_mode = st.sidebar.radio(
+    # Search Filters section
+    st.subheader("🔍 Search Filters")
+    search_mode = st.radio(
         "Select Search Mode",
         ["Simple Search", "Advanced Search", "Compare Properties"]
     )
     
     # Simple Search Mode
     if search_mode == "Simple Search":
-        st.sidebar.subheader("Quick Search")
-        
-        # Quick search options
-        quick_search = st.sidebar.selectbox(
-            "Select search criteria",
-            ["Rent Price", "Area", "Property Type", "Size"]
-        )
-        
-        if quick_search == "Rent Price":
-            rent_option = st.sidebar.radio(
-                "Rent preference",
-                ["Below budget", "Above budget", "Exact amount", "Range"]
+        with st.expander("Quick Search Options", expanded=True):
+            # Quick search options
+            quick_search = st.selectbox(
+                "Select search criteria",
+                ["Rent Price", "Area", "Property Type", "Size"]
             )
             
-            if rent_option == "Below budget":
-                max_rent = st.sidebar.number_input("Maximum rent (₹)", min_value=1000, value=20000, step=1000)
-                st.session_state.filters["max_rent"] = max_rent
-            elif rent_option == "Above budget":
-                min_rent = st.sidebar.number_input("Minimum rent (₹)", min_value=1000, value=10000, step=1000)
-                st.session_state.filters["min_rent"] = min_rent
-            elif rent_option == "Exact amount":
-                exact_rent = st.sidebar.number_input("Exact rent (₹)", min_value=1000, value=15000, step=1000)
-                st.session_state.filters["min_rent"] = exact_rent
-                st.session_state.filters["max_rent"] = exact_rent
-            else:  # Range
-                col1, col2 = st.sidebar.columns(2)
-                with col1:
-                    min_rent = st.number_input("Min rent (₹)", min_value=1000, value=10000, step=1000)
-                with col2:
-                    max_rent = st.number_input("Max rent (₹)", min_value=1000, value=25000, step=1000)
-                st.session_state.filters["min_rent"] = min_rent
-                st.session_state.filters["max_rent"] = max_rent
+            if quick_search == "Rent Price":
+                rent_option = st.radio(
+                    "Rent preference",
+                    ["Below budget", "Above budget", "Exact amount", "Range"]
+                )
                 
-        elif quick_search == "Area":
-            area = st.sidebar.selectbox("Select area in Nagpur", ["Any"] + areas)
-            if area != "Any":
-                st.session_state.filters["area"] = area
-            
-        elif quick_search == "Property Type":
-            prop_type = st.sidebar.selectbox("Select property type", ["Any"] + property_types)
-            if prop_type != "Any":
-                st.session_state.filters["property_type"] = prop_type
-            
-        elif quick_search == "Size":
-            size_option = st.sidebar.radio(
-                "Size preference",
-                ["Below size", "Above size", "Exact size", "Range"]
-            )
-            
-            if size_option == "Below size":
-                max_size = st.sidebar.number_input("Maximum size (sqft)", min_value=100, value=2000, step=100)
-                st.session_state.filters["max_size"] = max_size
-            elif size_option == "Above size":
-                min_size = st.sidebar.number_input("Minimum size (sqft)", min_value=100, value=1000, step=100)
-                st.session_state.filters["min_size"] = min_size
-            elif size_option == "Exact size":
-                exact_size = st.sidebar.number_input("Exact size (sqft)", min_value=100, value=1500, step=100)
-                st.session_state.filters["min_size"] = exact_size
-                st.session_state.filters["max_size"] = exact_size
-            else:  # Range
-                col1, col2 = st.sidebar.columns(2)
-                with col1:
-                    min_size = st.number_input("Min size (sqft)", min_value=100, value=1000, step=100)
-                with col2:
-                    max_size = st.number_input("Max size (sqft)", min_value=100, value=2000, step=100)
-                st.session_state.filters["min_size"] = min_size
-                st.session_state.filters["max_size"] = max_size
+                if rent_option == "Below budget":
+                    max_rent = st.number_input("Maximum rent (₹)", min_value=1000, value=20000, step=1000)
+                    st.session_state.filters["max_rent"] = max_rent
+                elif rent_option == "Above budget":
+                    min_rent = st.number_input("Minimum rent (₹)", min_value=1000, value=10000, step=1000)
+                    st.session_state.filters["min_rent"] = min_rent
+                elif rent_option == "Exact amount":
+                    exact_rent = st.number_input("Exact rent (₹)", min_value=1000, value=15000, step=1000)
+                    st.session_state.filters["min_rent"] = exact_rent
+                    st.session_state.filters["max_rent"] = exact_rent
+                else:  # Range
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        min_rent = st.number_input("Min rent (₹)", min_value=1000, value=10000, step=1000)
+                    with col2:
+                        max_rent = st.number_input("Max rent (₹)", min_value=1000, value=25000, step=1000)
+                    st.session_state.filters["min_rent"] = min_rent
+                    st.session_state.filters["max_rent"] = max_rent
+                    
+            elif quick_search == "Area":
+                area = st.selectbox("Select area in Nagpur", ["Any"] + areas)
+                if area != "Any":
+                    st.session_state.filters["area"] = area
+                
+            elif quick_search == "Property Type":
+                prop_type = st.selectbox("Select property type", ["Any"] + property_types)
+                if prop_type != "Any":
+                    st.session_state.filters["property_type"] = prop_type
+                
+            elif quick_search == "Size":
+                size_option = st.radio(
+                    "Size preference",
+                    ["Below size", "Above size", "Exact size", "Range"]
+                )
+                
+                if size_option == "Below size":
+                    max_size = st.number_input("Maximum size (sqft)", min_value=100, value=2000, step=100)
+                    st.session_state.filters["max_size"] = max_size
+                elif size_option == "Above size":
+                    min_size = st.number_input("Minimum size (sqft)", min_value=100, value=1000, step=100)
+                    st.session_state.filters["min_size"] = min_size
+                elif size_option == "Exact size":
+                    exact_size = st.number_input("Exact size (sqft)", min_value=100, value=1500, step=100)
+                    st.session_state.filters["min_size"] = exact_size
+                    st.session_state.filters["max_size"] = exact_size
+                else:  # Range
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        min_size = st.number_input("Min size (sqft)", min_value=100, value=1000, step=100)
+                    with col2:
+                        max_size = st.number_input("Max size (sqft)", min_value=100, value=2000, step=100)
+                    st.session_state.filters["min_size"] = min_size
+                    st.session_state.filters["max_size"] = max_size
     
     # Advanced Search Mode
     elif search_mode == "Advanced Search":
-        # Display current property count
-        st.sidebar.markdown(f"📊 Showing all {len(st.session_state.filtered_properties)} properties")
-        
-        st.sidebar.subheader("Search Options:")
-        
-        # 1. Size (sqft)
-        st.sidebar.markdown("1. **Size (sqft)**")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            min_size = st.number_input("Min", min_value=0, value=0, key="min_size")
-        with col2:
-            max_size = st.number_input("Max", min_value=0, value=10000, key="max_size")
-        
-        # 2. Carpet Area (sqft)
-        st.sidebar.markdown("2. **Carpet Area (sqft)**")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            min_carpet = st.number_input("Min", min_value=0, value=0, key="min_carpet")
-        with col2:
-            max_carpet = st.number_input("Max", min_value=0, value=10000, key="max_carpet")
-        
-        # 3. Age of Property
-        st.sidebar.markdown("3. **Age of Property**")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            min_age = st.number_input("Min", min_value=0, value=0, key="min_age")
-        with col2:
-            max_age = st.number_input("Max", min_value=0, value=50, key="max_age")
-        
-        # 4. Brokerage
-        st.sidebar.markdown("4. **Brokerage**")
-        brokerage = st.sidebar.multiselect("Select", ["Yes", "No"], key="brokerage")
-        
-        # 5. Property ID
-        st.sidebar.markdown("5. **Property ID**")
-        property_id = st.sidebar.text_input("Enter ID", key="property_id")
-        
-        # 6. Furnishing
-        st.sidebar.markdown("6. **Furnishing**")
-        furnishing = st.sidebar.multiselect("Select", ["Furnished", "Unfurnished"], key="furnishing")
-        
-        # 7. Security Deposit
-        st.sidebar.markdown("7. **Security Deposit**")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            min_deposit = st.number_input("Min", min_value=0, value=0, key="min_deposit")
-        with col2:
-            max_deposit = st.number_input("Max", min_value=0, value=1000000, key="max_deposit")
-        
-        # 8. Rent Price
-        st.sidebar.markdown("8. **Rent Price**")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            min_rent = st.number_input("Min", min_value=0, value=0, key="min_rent")
-        with col2:
-            max_rent = st.number_input("Max", min_value=0, value=100000, key="max_rent")
-        
-        # 9. Area
-        st.sidebar.markdown("9. **Area**")
-        area = st.sidebar.multiselect("Select", areas, key="area")
-        
-        # 10. Zone
-        st.sidebar.markdown("10. **Zone**")
-        zone = st.sidebar.multiselect("Select", zones, key="zone")
-        
-        # 11. Floor Number
-        st.sidebar.markdown("11. **Floor Number**")
-        floor_no = st.sidebar.multiselect("Select", floor_nos, key="floor_no")
-        
-        # 12. Total Floors
-        st.sidebar.markdown("12. **Total Floors**")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            min_total_floors = st.number_input("Min", min_value=0, value=0, key="min_total_floors")
-        with col2:
-            max_total_floors = st.number_input("Max", min_value=0, value=100, key="max_total_floors")
-        
-        # 13. Property Type
-        st.sidebar.markdown("13. **Property Type**")
-        property_type = st.sidebar.multiselect("Select", property_types, key="property_type")
-        
-        # 14. Ownership
-        st.sidebar.markdown("14. **Ownership**")
-        ownership = st.sidebar.multiselect("Select", ownerships, key="ownership")
-        
-        # 15. Possession Status
-        st.sidebar.markdown("15. **Possession Status**")
-        possession_status = st.sidebar.multiselect("Select", possession_statuses, key="possession_status")
-        
-        # 16. Location Hub
-        st.sidebar.markdown("16. **Location Hub**")
-        location_hub = st.sidebar.multiselect("Select", location_hubs, key="location_hub")
-        
-        # 17. Facilities
-        st.sidebar.markdown("17. **Facilities**")
-        selected_facilities = st.sidebar.multiselect("Select", facilities, key="facilities")
-        
-        # 18. Lock-in Period
-        st.sidebar.markdown("18. **Lock-in Period**")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            min_lock_in = st.number_input("Min (months)", min_value=0, value=0, key="min_lock_in")
-        with col2:
-            max_lock_in = st.number_input("Max (months)", min_value=0, value=60, key="max_lock_in")
-        
-        # Action buttons
-        st.sidebar.markdown("---")
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            if st.button("R. Reset all filters"):
-                st.session_state.filters = {}
-                st.session_state.filtered_properties = properties_data
-                st.rerun()
-        with col2:
-            if st.button("V. View current properties"):
-                # Build filters dictionary
-                filters = {}
-                
-                # Size filters
-                if min_size > 0:
-                    filters["min_size"] = min_size
-                if max_size > 0:
-                    filters["max_size"] = max_size
-                
-                # Carpet area filters
-                if min_carpet > 0:
-                    filters["min_carpet_area"] = min_carpet
-                if max_carpet > 0:
-                    filters["max_carpet_area"] = max_carpet
-                
-                # Age filters
-                if min_age > 0:
-                    filters["min_age"] = min_age
-                if max_age > 0:
-                    filters["max_age"] = max_age
-                
-                # Brokerage filter
-                if brokerage:
-                    # Handle multiple selections
-                    if len(brokerage) == 1:
-                        filters["brokerage"] = brokerage[0].lower()
-                    else:
-                        # For multiple selections, we need to handle it differently
-                        # We'll create a custom filter for this
-                        filters["brokerage_list"] = [b.lower() for b in brokerage]
-                
-                # Property ID filter
-                if property_id:
-                    filters["property_id"] = property_id
-                
-                # Furnishing filter
-                if furnishing:
-                    # Handle multiple selections
-                    if len(furnishing) == 1:
-                        filters["furnishing"] = furnishing[0].lower()
-                    else:
-                        # For multiple selections, we need to handle it differently
-                        # We'll create a custom filter for this
-                        filters["furnishing_list"] = [f.lower() for f in furnishing]
-                
-                # Security deposit filters
-                if min_deposit > 0:
-                    filters["min_security_deposit"] = min_deposit
-                if max_deposit > 0:
-                    filters["max_security_deposit"] = max_deposit
-                
-                # Rent filters
-                if min_rent > 0:
-                    filters["min_rent"] = min_rent
-                if max_rent > 0:
-                    filters["max_rent"] = max_rent
-                
-                # Area filter
-                if area:
-                    filters["area"] = area
-                
-                # Zone filter
-                if zone:
-                    filters["zone"] = zone
-                
-                # Floor number filter
-                if floor_no:
-                    filters["floor_no"] = floor_no
-                
-                # Total floors filters
-                if min_total_floors > 0:
-                    filters["min_total_floors"] = min_total_floors
-                if max_total_floors > 0:
-                    filters["max_total_floors"] = max_total_floors
-                
-                # Property type filter
-                if property_type:
-                    filters["property_type"] = property_type
-                
-                # Ownership filter
-                if ownership:
-                    filters["ownership"] = ownership
-                
-                # Possession status filter
-                if possession_status:
-                    filters["possession_status"] = possession_status
-                
-                # Location hub filter
-                if location_hub:
-                    filters["location_hub"] = location_hub
-                
-                # Facilities filter
-                if selected_facilities:
-                    filters["facilities"] = selected_facilities
-                
-                # Lock-in period filters
-                if min_lock_in > 0:
-                    filters["min_lock_in_period"] = min_lock_in
-                if max_lock_in > 0:
-                    filters["max_lock_in_period"] = max_lock_in
-                
-                # Apply filters
-                st.session_state.filters = filters
-                st.session_state.filtered_properties = filter_properties(properties_data, filters)
-                st.rerun()
+        with st.expander("Advanced Filter Options", expanded=True):
+            # Display current property count
+            st.markdown(f"📊 Showing all {len(st.session_state.filtered_properties)} properties")
+            
+            st.markdown("### Search Options:")
+            
+            # 1. Size (sqft)
+            st.markdown("1. **Size (sqft)**")
+            col1, col2 = st.columns(2)
+            with col1:
+                min_size = st.number_input("Min", min_value=0, value=0, key="min_size")
+            with col2:
+                max_size = st.number_input("Max", min_value=0, value=10000, key="max_size")
+            
+            # 2. Carpet Area (sqft)
+            st.markdown("2. **Carpet Area (sqft)**")
+            col1, col2 = st.columns(2)
+            with col1:
+                min_carpet = st.number_input("Min", min_value=0, value=0, key="min_carpet")
+            with col2:
+                max_carpet = st.number_input("Max", min_value=0, value=10000, key="max_carpet")
+            
+            # 3. Age of Property
+            st.markdown("3. **Age of Property**")
+            col1, col2 = st.columns(2)
+            with col1:
+                min_age = st.number_input("Min", min_value=0, value=0, key="min_age")
+            with col2:
+                max_age = st.number_input("Max", min_value=0, value=50, key="max_age")
+            
+            # 4. Brokerage
+            st.markdown("4. **Brokerage**")
+            brokerage = st.multiselect("Select", ["Yes", "No"], key="brokerage")
+            
+            # 5. Property ID
+            st.markdown("5. **Property ID**")
+            property_id = st.text_input("Enter ID", key="property_id")
+            
+            # 6. Furnishing
+            st.markdown("6. **Furnishing**")
+            furnishing = st.multiselect("Select", ["Furnished", "Unfurnished"], key="furnishing")
+            
+            # 7. Security Deposit
+            st.markdown("7. **Security Deposit**")
+            col1, col2 = st.columns(2)
+            with col1:
+                min_deposit = st.number_input("Min", min_value=0, value=0, key="min_deposit")
+            with col2:
+                max_deposit = st.number_input("Max", min_value=0, value=1000000, key="max_deposit")
+            
+            # 8. Rent Price
+            st.markdown("8. **Rent Price**")
+            col1, col2 = st.columns(2)
+            with col1:
+                min_rent = st.number_input("Min", min_value=0, value=0, key="min_rent")
+            with col2:
+                max_rent = st.number_input("Max", min_value=0, value=100000, key="max_rent")
+            
+            # 9. Area
+            st.markdown("9. **Area**")
+            area = st.multiselect("Select", areas, key="area")
+            
+            # 10. Zone
+            st.markdown("10. **Zone**")
+            zone = st.multiselect("Select", zones, key="zone")
+            
+            # 11. Floor Number
+            st.markdown("11. **Floor Number**")
+            floor_no = st.multiselect("Select", floor_nos, key="floor_no")
+            
+            # 12. Total Floors
+            st.markdown("12. **Total Floors**")
+            col1, col2 = st.columns(2)
+            with col1:
+                min_total_floors = st.number_input("Min", min_value=0, value=0, key="min_total_floors")
+            with col2:
+                max_total_floors = st.number_input("Max", min_value=0, value=100, key="max_total_floors")
+            
+            # 13. Property Type
+            st.markdown("13. **Property Type**")
+            property_type = st.multiselect("Select", property_types, key="property_type")
+            
+            # 14. Ownership
+            st.markdown("14. **Ownership**")
+            ownership = st.multiselect("Select", ownerships, key="ownership")
+            
+            # 15. Possession Status
+            st.markdown("15. **Possession Status**")
+            possession_status = st.multiselect("Select", possession_statuses, key="possession_status")
+            
+            # 16. Location Hub
+            st.markdown("16. **Location Hub**")
+            location_hub = st.multiselect("Select", location_hubs, key="location_hub")
+            
+            # 17. Facilities
+            st.markdown("17. **Facilities**")
+            selected_facilities = st.multiselect("Select", facilities, key="facilities")
+            
+            # 18. Lock-in Period
+            st.markdown("18. **Lock-in Period**")
+            col1, col2 = st.columns(2)
+            with col1:
+                min_lock_in = st.number_input("Min (months)", min_value=0, value=0, key="min_lock_in")
+            with col2:
+                max_lock_in = st.number_input("Max (months)", min_value=0, value=60, key="max_lock_in")
+            
+            # Action buttons
+            st.markdown("---")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("Reset all filters"):
+                    st.session_state.filters = {}
+                    st.session_state.filtered_properties = properties_data
+                    st.rerun()
+            with col2:
+                if st.button("View current properties"):
+                    # Build filters dictionary
+                    filters = {}
+                    
+                    # Size filters
+                    if min_size > 0:
+                        filters["min_size"] = min_size
+                    if max_size > 0:
+                        filters["max_size"] = max_size
+                    
+                    # Carpet area filters
+                    if min_carpet > 0:
+                        filters["min_carpet_area"] = min_carpet
+                    if max_carpet > 0:
+                        filters["max_carpet_area"] = max_carpet
+                    
+                    # Age filters
+                    if min_age > 0:
+                        filters["min_age"] = min_age
+                    if max_age > 0:
+                        filters["max_age"] = max_age
+                    
+                    # Brokerage filter
+                    if brokerage:
+                        # Handle multiple selections
+                        if len(brokerage) == 1:
+                            filters["brokerage"] = brokerage[0].lower()
+                        else:
+                            # For multiple selections, we need to handle it differently
+                            # We'll create a custom filter for this
+                            filters["brokerage_list"] = [b.lower() for b in brokerage]
+                    
+                    # Property ID filter
+                    if property_id:
+                        filters["property_id"] = property_id
+                    
+                    # Furnishing filter
+                    if furnishing:
+                        # Handle multiple selections
+                        if len(furnishing) == 1:
+                            filters["furnishing"] = furnishing[0].lower()
+                        else:
+                            # For multiple selections, we need to handle it differently
+                            # We'll create a custom filter for this
+                            filters["furnishing_list"] = [f.lower() for f in furnishing]
+                    
+                    # Security deposit filters
+                    if min_deposit > 0:
+                        filters["min_security_deposit"] = min_deposit
+                    if max_deposit > 0:
+                        filters["max_security_deposit"] = max_deposit
+                    
+                    # Rent filters
+                    if min_rent > 0:
+                        filters["min_rent"] = min_rent
+                    if max_rent > 0:
+                        filters["max_rent"] = max_rent
+                    
+                    # Area filter
+                    if area:
+                        filters["area"] = area
+                    
+                    # Zone filter
+                    if zone:
+                        filters["zone"] = zone
+                    
+                    # Floor number filter
+                    if floor_no:
+                        filters["floor_no"] = floor_no
+                    
+                    # Total floors filters
+                    if min_total_floors > 0:
+                        filters["min_total_floors"] = min_total_floors
+                    if max_total_floors > 0:
+                        filters["max_total_floors"] = max_total_floors
+                    
+                    # Property type filter
+                    if property_type:
+                        filters["property_type"] = property_type
+                    
+                    # Ownership filter
+                    if ownership:
+                        filters["ownership"] = ownership
+                    
+                    # Possession status filter
+                    if possession_status:
+                        filters["possession_status"] = possession_status
+                    
+                    # Location hub filter
+                    if location_hub:
+                        filters["location_hub"] = location_hub
+                    
+                    # Facilities filter
+                    if selected_facilities:
+                        filters["facilities"] = selected_facilities
+                    
+                    # Lock-in period filters
+                    if min_lock_in > 0:
+                        filters["min_lock_in_period"] = min_lock_in
+                    if max_lock_in > 0:
+                        filters["max_lock_in_period"] = max_lock_in
+                    
+                    # Apply filters
+                    st.session_state.filters = filters
+                    st.session_state.filtered_properties = filter_properties(properties_data, filters)
+                    st.rerun()
     
     # Compare Properties Mode
     else:  # Compare Properties
-        st.sidebar.subheader("Property Comparison")
-        property_ids = st.sidebar.text_input(
-            "Enter property IDs to compare (comma separated)",
-            help="Example: Property_1, Property_2, Property_3"
-        )
-        if property_ids:
-            st.session_state.filters["compare"] = property_ids
+        with st.expander("Property Comparison Options", expanded=True):
+            property_ids = st.text_input(
+                "Enter property IDs to compare (comma separated)",
+                help="Example: Property_1, Property_2, Property_3"
+            )
+            if property_ids:
+                st.session_state.filters["compare"] = property_ids
     
     # Apply filters button (for non-advanced search modes)
     if search_mode != "Advanced Search":
-        if st.sidebar.button("Apply Filters", type="primary"):
-            # Build filters dictionary
-            filters = {}
-            
-            # Simple Search filters
-            if search_mode == "Simple Search":
-                # Filters are already set in the session state
-                filters = st.session_state.filters.copy()
-            
-            # Apply filters
-            st.session_state.filters = filters
-            if search_mode == "Compare Properties" and "compare" in filters:
-                # For comparison mode, we don't filter the properties
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Apply Filters", type="primary"):
+                # Build filters dictionary
+                filters = {}
+                
+                # Simple Search filters
+                if search_mode == "Simple Search":
+                    # Filters are already set in the session state
+                    filters = st.session_state.filters.copy()
+                
+                # Apply filters
+                st.session_state.filters = filters
+                if search_mode == "Compare Properties" and "compare" in filters:
+                    # For comparison mode, we don't filter the properties
+                    st.session_state.filtered_properties = properties_data
+                else:
+                    st.session_state.filtered_properties = filter_properties(properties_data, filters)
+        with col2:
+            if st.button("Reset Filters"):
+                st.session_state.filters = {}
                 st.session_state.filtered_properties = properties_data
-            else:
-                st.session_state.filtered_properties = filter_properties(properties_data, filters)
+                st.rerun()
     
     # Display current filters
     if st.session_state.filters and search_mode != "Advanced Search":
-        st.sidebar.subheader("Active Filters")
-        for filter_type, value in st.session_state.filters.items():
+        st.subheader("Active Filters")
+        cols = st.columns(4)
+        for i, (filter_type, value) in enumerate(st.session_state.filters.items()):
             if filter_type in ["min_rent", "max_rent", "min_size", "max_size", 
                               "min_carpet_area", "max_carpet_area", 
                               "min_age", "max_age", 
                               "min_security_deposit", "max_security_deposit",
                               "min_total_floors", "max_total_floors",
                               "min_lock_in_period", "max_lock_in_period"]:
-                st.sidebar.text(f"{filter_type.replace('_', ' ').title()}: {value}")
+                with cols[i % 4]:
+                    st.text(f"{filter_type.replace('_', ' ').title()}: {value}")
             else:
-                st.sidebar.text(f"{filter_type.replace('_', ' ').title()}: {value}")
+                with cols[i % 4]:
+                    st.text(f"{filter_type.replace('_', ' ').title()}: {value}")
     
     # Main content area
     if st.session_state.filters:
@@ -1122,7 +1101,7 @@ def main():
         # Display welcome message and sample properties
         st.header("Welcome to Commercial Property Search - Nagpur")
         st.markdown("""
-        Use the filters in the sidebar to find properties that match your criteria in Nagpur. 
+        Use the filters above to find properties that match your criteria in Nagpur. 
         You can search by various attributes like rent, area, property type, and more.
         
         **Features:**
