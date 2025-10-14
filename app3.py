@@ -541,14 +541,15 @@ def main():
     if st.session_state.user_location:
         st.info(f"Your location: {st.session_state.user_location[0]:.6f}, {st.session_state.user_location[1]:.6f}")
     
-    # Sidebar for filters
-    st.sidebar.header("🔍 Search Filters")
-    
-    # Search mode selection
-    search_mode = st.sidebar.radio(
+    # Search Filters section moved to main area
+    st.subheader("🔍 Search Filters")
+    search_mode = st.radio(
         "Select Search Mode",
         ["Simple Search", "Advanced Search", "Compare Properties"]
     )
+    
+    # Sidebar for remaining filters
+    st.sidebar.header("Filter Options")
     
     # Category options for dropdowns
     CATEGORY_OPTIONS = {
@@ -575,7 +576,7 @@ def main():
     
     # Simple Search Mode
     if search_mode == "Simple Search":
-        st.sidebar.subheader("Quick Search")
+        st.sidebar.subheader("Quick Search Options")
         
         # Quick search options
         quick_search = st.sidebar.selectbox(
@@ -620,7 +621,7 @@ def main():
     
     # Advanced Search Mode
     elif search_mode == "Advanced Search":
-        st.sidebar.subheader("Advanced Filters")
+        st.sidebar.subheader("Advanced Filter Options")
         
         # Allow user to select multiple filters
         selected_filters = st.sidebar.multiselect(
@@ -668,7 +669,7 @@ def main():
     
     # Compare Properties Mode
     else:  # Compare Properties
-        st.sidebar.subheader("Property Comparison")
+        st.sidebar.subheader("Property Comparison Options")
         property_ids = st.sidebar.text_input(
             "Enter property IDs to compare (comma separated)",
             help="Example: 101, 102, 105"
@@ -677,16 +678,16 @@ def main():
             st.session_state.filters["compare"] = property_ids
     
     # Apply filters button - more prominent
-    st.sidebar.markdown("---")
-    apply_col, reset_col = st.sidebar.columns(2)
+    st.markdown("---")
+    col1, col2 = st.columns(2)
     
-    with apply_col:
+    with col1:
         if st.button("Apply Filters", type="primary"):
             st.session_state.apply_filters = True
         else:
             st.session_state.apply_filters = False
     
-    with reset_col:
+    with col2:
         if st.button("Reset Filters"):
             st.session_state.filters = {}
             st.session_state.apply_filters = False
@@ -824,7 +825,7 @@ def main():
         # Display welcome message and sample properties
         st.header("Welcome to Property Search Assistant - Nagpur")
         st.markdown("""
-        Use the filters in the sidebar to find properties that match your criteria in Nagpur. 
+        Use the filters above to find properties that match your criteria in Nagpur. 
         You can search by various attributes like rent, area, property type, and more.
         
         **Features:**
