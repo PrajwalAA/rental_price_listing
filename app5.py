@@ -7,6 +7,8 @@ import folium
 from streamlit_folium import folium_static
 from collections import defaultdict
 import re
+import math
+from math import radians, sin, cos, sqrt, atan2
 
 # Set page configuration
 st.set_page_config(
@@ -34,6 +36,26 @@ properties_data = load_properties()
 # --- Helper for normalization ---
 def normalize_facility_name(facility_name):
     return str(facility_name).replace(" ", "_").lower().strip()
+
+# --- Haversine formula for distance calculation ---
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """
+    Calculate the great circle distance between two points 
+    on the earth (specified in decimal degrees)
+    Returns distance in kilometers
+    """
+    # Convert decimal degrees to radians
+    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+    
+    # Haversine formula
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1-a))
+    
+    # Radius of earth in kilometers
+    r = 6371
+    return c * r
 
 # --- Function to format property details ---
 def format_property(prop, distance=None):
@@ -317,8 +339,8 @@ def create_property_map(properties, user_location=None):
             prop_lat = default_lat + random.uniform(-0.1, 0.1)
             prop_lon = default_lon + random.uniform(-0.1, 0.1)
             
-            # Calculate distance (simplified for demo)
-            distance = ((prop_lat - user_lat)**2 + (prop_lon - user_lon)**2)**0.5 * 111  # Approximate km
+            # Calculate distance using Haversine formula
+            distance = haversine_distance(user_lat, user_lon, prop_lat, prop_lon)
             distances.append(distance)
             prop["distance_from_user"] = distance
         
@@ -386,7 +408,7 @@ def create_property_map(properties, user_location=None):
         '''
         m.get_root().html.add_child(folium.Element(legend_html))
     
-    return m
+    return m, avg_distance
 
 # --- Main App ---
 def main():
@@ -807,7 +829,7 @@ def main():
                     
                     # Create and display the map
                     try:
-                        property_map = create_property_map(st.session_state.filtered_properties, st.session_state.user_location)
+                        property_map, avg_distance = create_property_map(st.session_state.filtered_properties, st.session_state.user_location)
                         folium_static(property_map, width=700, height=500)
                         
                         # Add map controls explanation
@@ -821,6 +843,10 @@ def main():
                           - Blue: Below average distance from you
                           - Red: Above average distance from you
                         """)
+                        
+                        # Display average distance
+                        if avg_distance is not None:
+                            st.info(f"📏 Average distance from your location: {avg_distance:.2f} km")
                     except Exception as e:
                         st.error(f"Error displaying map: {str(e)}")
                         st.info("Please check if you have a stable internet connection for map loading.")
@@ -921,6 +947,39 @@ def main():
                             fig_distance.add_vline(x=avg_distance, line_dash="dash", line_color="red",
                                                  annotation_text=f"Avg: {avg_distance:.2f} km")
                             st.plotly_chart(fig_distance, use_container_width=True)
+                            
+                            # Distance bar graph with average line
+                            st.subheader("Property Distance from Your Location")
+                            # Create a bar chart for each property's distance
+                            bar_data = df[['property_id', 'distance_from_user']].copy()
+                            bar_data['property_label'] = 'ID: ' + bar_data['property_id']
+                            
+                            # Create a bar chart with conditional coloring
+                            fig_bar = go.Figure()
+                            # Add bars below average in blue
+                            below_avg = bar_data[bar_data['distance_from_user'] <= avg_distance]
+                            fig_bar.add_trace(go.Bar(
+                                x=below_avg['property_label'],
+                                y=below_avg['distance_from_user'],
+                                name='Below Average',
+                                marker_color='blue'
+                            ))
+                            # Add bars above average in red
+                            above_avg = bar_data[bar_data['distance_from_user'] > avg_distance]
+                            fig_bar.add_trace(go.Bar(
+                                x=above_avg['property_label'],
+                                y=above_avg['distance_from_user'],
+                                name='Above Average',
+                                marker_color='red'
+                            ))
+                            
+                            fig_bar.update_layout(
+                                title=f"Property Distance from Your Location (Average: {avg_distance:.2f} km)",
+                                xaxis_title="Property ID",
+                                yaxis_title="Distance (km)",
+                                barmode='group'
+                            )
+                            st.plotly_chart(fig_bar, use_container_width=True)
     else:
         # Display welcome message and sample properties
         st.header("Welcome to Commercial Property Search")
