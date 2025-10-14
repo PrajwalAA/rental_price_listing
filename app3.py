@@ -17,7 +17,7 @@ st.set_page_config(
     page_title="Property Search Assistant - Nagpur app4",
     page_icon="🏠",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"  # Changed to collapsed since we're not using sidebar
 )
 
 # --- Load properties from JSON file ---
@@ -510,7 +510,7 @@ def main():
     st.markdown("### 🔍 Search in Nagpur City")
     st.info("All search results are limited to properties within Nagpur city limits.")
     
-    # User location section moved to main area
+    # User location section
     st.subheader("📍 Your Location")
     col1, col2 = st.columns(2)
     
@@ -541,15 +541,12 @@ def main():
     if st.session_state.user_location:
         st.info(f"Your location: {st.session_state.user_location[0]:.6f}, {st.session_state.user_location[1]:.6f}")
     
-    # Search Filters section moved to main area
+    # Search Filters section
     st.subheader("🔍 Search Filters")
     search_mode = st.radio(
         "Select Search Mode",
         ["Simple Search", "Advanced Search", "Compare Properties"]
     )
-    
-    # Sidebar for remaining filters
-    st.sidebar.header("Filter Options")
     
     # Category options for dropdowns
     CATEGORY_OPTIONS = {
@@ -576,106 +573,104 @@ def main():
     
     # Simple Search Mode
     if search_mode == "Simple Search":
-        st.sidebar.subheader("Quick Search Options")
-        
-        # Quick search options
-        quick_search = st.sidebar.selectbox(
-            "Select search criteria",
-            ["Rent Price", "Area", "Property Type", "Bedrooms"]
-        )
-        
-        if quick_search == "Rent Price":
-            rent_option = st.sidebar.radio(
-                "Rent preference",
-                ["Below budget", "Above budget", "Exact amount", "Range"]
+        with st.expander("Quick Search Options", expanded=True):
+            # Quick search options
+            quick_search = st.selectbox(
+                "Select search criteria",
+                ["Rent Price", "Area", "Property Type", "Bedrooms"]
             )
             
-            if rent_option == "Below budget":
-                max_rent = st.sidebar.number_input("Maximum rent (₹)", min_value=1000, value=20000, step=1000)
-                st.session_state.filters["rent"] = f"below {max_rent}"
-            elif rent_option == "Above budget":
-                min_rent = st.sidebar.number_input("Minimum rent (₹)", min_value=1000, value=10000, step=1000)
-                st.session_state.filters["rent"] = f"above {min_rent}"
-            elif rent_option == "Exact amount":
-                exact_rent = st.sidebar.number_input("Exact rent (₹)", min_value=1000, value=15000, step=1000)
-                st.session_state.filters["rent"] = str(exact_rent)
-            else:  # Range
-                col1, col2 = st.sidebar.columns(2)
-                with col1:
-                    min_rent = st.number_input("Min rent (₹)", min_value=1000, value=10000, step=1000)
-                with col2:
-                    max_rent = st.number_input("Max rent (₹)", min_value=1000, value=25000, step=1000)
-                st.session_state.filters["rent"] = f"between {min_rent} and {max_rent}"
+            if quick_search == "Rent Price":
+                rent_option = st.radio(
+                    "Rent preference",
+                    ["Below budget", "Above budget", "Exact amount", "Range"]
+                )
                 
-        elif quick_search == "Area":
-            area = st.sidebar.selectbox("Select area in Nagpur", ALL_AREAS)
-            st.session_state.filters["area"] = area
-            
-        elif quick_search == "Property Type":
-            prop_type = st.sidebar.selectbox("Select property type", ALL_PROPERTY_TYPES)
-            st.session_state.filters["property_type"] = prop_type
-            
-        elif quick_search == "Bedrooms":
-            bedrooms = st.sidebar.slider("Number of bedrooms", 1, 5, 2)
-            st.session_state.filters["bedrooms"] = str(bedrooms)
+                if rent_option == "Below budget":
+                    max_rent = st.number_input("Maximum rent (₹)", min_value=1000, value=20000, step=1000)
+                    st.session_state.filters["rent"] = f"below {max_rent}"
+                elif rent_option == "Above budget":
+                    min_rent = st.number_input("Minimum rent (₹)", min_value=1000, value=10000, step=1000)
+                    st.session_state.filters["rent"] = f"above {min_rent}"
+                elif rent_option == "Exact amount":
+                    exact_rent = st.number_input("Exact rent (₹)", min_value=1000, value=15000, step=1000)
+                    st.session_state.filters["rent"] = str(exact_rent)
+                else:  # Range
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        min_rent = st.number_input("Min rent (₹)", min_value=1000, value=10000, step=1000)
+                    with col2:
+                        max_rent = st.number_input("Max rent (₹)", min_value=1000, value=25000, step=1000)
+                    st.session_state.filters["rent"] = f"between {min_rent} and {max_rent}"
+                    
+            elif quick_search == "Area":
+                area = st.selectbox("Select area in Nagpur", ALL_AREAS)
+                st.session_state.filters["area"] = area
+                
+            elif quick_search == "Property Type":
+                prop_type = st.selectbox("Select property type", ALL_PROPERTY_TYPES)
+                st.session_state.filters["property_type"] = prop_type
+                
+            elif quick_search == "Bedrooms":
+                bedrooms = st.slider("Number of bedrooms", 1, 5, 2)
+                st.session_state.filters["bedrooms"] = str(bedrooms)
     
     # Advanced Search Mode
     elif search_mode == "Advanced Search":
-        st.sidebar.subheader("Advanced Filter Options")
-        
-        # Allow user to select multiple filters
-        selected_filters = st.sidebar.multiselect(
-            "Select filters to apply",
-            list(search_map.values())[:-1],  # Removed proximity_points and amenities_list
-            default=["rent", "area"]
-        )
-        
-        # Generate input fields for selected filters
-        for field in selected_filters:
-            if field in CATEGORY_OPTIONS and CATEGORY_OPTIONS[field]:
-                # For categorical fields, use selectbox
-                options = CATEGORY_OPTIONS[field]
-                selected_option = st.sidebar.selectbox(
-                    f"Select {field.replace('_', ' ').title()}",
-                    options=options
-                )
-                st.session_state.filters[field] = selected_option
-            elif field == "facilities":
-                # For facilities, use multiselect
-                selected_facilities = st.sidebar.multiselect(
-                    "Select facilities",
-                    options=ALL_FACILITIES
-                )
-                st.session_state.filters[field] = ', '.join(selected_facilities)
-            elif field == "nearby_amenities":
-                # For nearby amenities, use multiselect
-                selected_amenities = st.sidebar.multiselect(
-                    "Select nearby amenities",
-                    options=ALL_NEARBY_AMENITIES
-                )
-                st.session_state.filters[field] = ', '.join(selected_amenities)
-            else:
-                # For numeric fields, provide text input with instructions
-                help_text = ""
-                if field in ["size", "carpet", "age", "security", "rent", "amenities", "bedrooms", "bathrooms", "balcony", "floor_no", "total_floors", "maintenance"]:
-                    help_text = "You can use: 'below 1000', 'above 500', 'between 500 and 1000', or exact number"
-                
-                user_input = st.sidebar.text_input(
-                    f"Enter {field.replace('_', ' ').title()}",
-                    help=help_text
-                )
-                if user_input:
-                    st.session_state.filters[field] = user_input
+        with st.expander("Advanced Filter Options", expanded=True):
+            # Allow user to select multiple filters
+            selected_filters = st.multiselect(
+                "Select filters to apply",
+                list(search_map.values())[:-1],  # Removed proximity_points and amenities_list
+                default=["rent", "area"]
+            )
+            
+            # Generate input fields for selected filters
+            for field in selected_filters:
+                if field in CATEGORY_OPTIONS and CATEGORY_OPTIONS[field]:
+                    # For categorical fields, use selectbox
+                    options = CATEGORY_OPTIONS[field]
+                    selected_option = st.selectbox(
+                        f"Select {field.replace('_', ' ').title()}",
+                        options=options
+                    )
+                    st.session_state.filters[field] = selected_option
+                elif field == "facilities":
+                    # For facilities, use multiselect
+                    selected_facilities = st.multiselect(
+                        "Select facilities",
+                        options=ALL_FACILITIES
+                    )
+                    st.session_state.filters[field] = ', '.join(selected_facilities)
+                elif field == "nearby_amenities":
+                    # For nearby amenities, use multiselect
+                    selected_amenities = st.multiselect(
+                        "Select nearby amenities",
+                        options=ALL_NEARBY_AMENITIES
+                    )
+                    st.session_state.filters[field] = ', '.join(selected_amenities)
+                else:
+                    # For numeric fields, provide text input with instructions
+                    help_text = ""
+                    if field in ["size", "carpet", "age", "security", "rent", "amenities", "bedrooms", "bathrooms", "balcony", "floor_no", "total_floors", "maintenance"]:
+                        help_text = "You can use: 'below 1000', 'above 500', 'between 500 and 1000', or exact number"
+                    
+                    user_input = st.text_input(
+                        f"Enter {field.replace('_', ' ').title()}",
+                        help=help_text
+                    )
+                    if user_input:
+                        st.session_state.filters[field] = user_input
     
     # Compare Properties Mode
     else:  # Compare Properties
-        st.sidebar.subheader("Property Comparison Options")
-        property_ids = st.sidebar.text_input(
-            "Enter property IDs to compare (comma separated)",
-            help="Example: 101, 102, 105"
-        )
-        if property_ids:
-            st.session_state.filters["compare"] = property_ids
+        with st.expander("Property Comparison Options", expanded=True):
+            property_ids = st.text_input(
+                "Enter property IDs to compare (comma separated)",
+                help="Example: 101, 102, 105"
+            )
+            if property_ids:
+                st.session_state.filters["compare"] = property_ids
     
     # Apply filters button - more prominent
     st.markdown("---")
