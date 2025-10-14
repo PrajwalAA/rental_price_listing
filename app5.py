@@ -156,28 +156,56 @@ def filter_properties(data, filters):
             filtered = [p for p in filtered if p.get("city", "").lower() == value.lower()]
         
         elif filter_type == "area" and value:
-            filtered = [p for p in filtered if p.get("area", "").lower() == value.lower()]
+            # Handle both single value and list of values
+            if isinstance(value, list):
+                filtered = [p for p in filtered if p.get("area", "").lower() in [v.lower() for v in value]]
+            else:
+                filtered = [p for p in filtered if p.get("area", "").lower() == value.lower()]
         
         elif filter_type == "zone" and value:
-            filtered = [p for p in filtered if p.get("zone", "").lower() == value.lower()]
+            # Handle both single value and list of values
+            if isinstance(value, list):
+                filtered = [p for p in filtered if p.get("zone", "").lower() in [v.lower() for v in value]]
+            else:
+                filtered = [p for p in filtered if p.get("zone", "").lower() == value.lower()]
         
         elif filter_type == "property_type" and value:
-            filtered = [p for p in filtered if p.get("property_type", "").lower() == value.lower()]
+            # Handle both single value and list of values
+            if isinstance(value, list):
+                filtered = [p for p in filtered if p.get("property_type", "").lower() in [v.lower() for v in value]]
+            else:
+                filtered = [p for p in filtered if p.get("property_type", "").lower() == value.lower()]
         
         elif filter_type == "ownership" and value:
-            filtered = [p for p in filtered if p.get("ownership", "").lower() == value.lower()]
+            # Handle both single value and list of values
+            if isinstance(value, list):
+                filtered = [p for p in filtered if p.get("ownership", "").lower() in [v.lower() for v in value]]
+            else:
+                filtered = [p for p in filtered if p.get("ownership", "").lower() == value.lower()]
         
         elif filter_type == "possession_status" and value:
-            filtered = [p for p in filtered if p.get("possession_status", "").lower() == value.lower()]
+            # Handle both single value and list of values
+            if isinstance(value, list):
+                filtered = [p for p in filtered if p.get("possession_status", "").lower() in [v.lower() for v in value]]
+            else:
+                filtered = [p for p in filtered if p.get("possession_status", "").lower() == value.lower()]
         
         elif filter_type == "location_hub" and value:
-            filtered = [p for p in filtered if p.get("location_hub", "").lower() == value.lower()]
+            # Handle both single value and list of values
+            if isinstance(value, list):
+                filtered = [p for p in filtered if p.get("location_hub", "").lower() in [v.lower() for v in value]]
+            else:
+                filtered = [p for p in filtered if p.get("location_hub", "").lower() == value.lower()]
         
         elif filter_type == "property_id" and value:
             filtered = [p for p in filtered if p.get("property_id", "").lower() == value.lower()]
         
         elif filter_type == "floor_no" and value:
-            filtered = [p for p in filtered if p.get("floor_no", "").lower() == value.lower()]
+            # Handle both single value and list of values
+            if isinstance(value, list):
+                filtered = [p for p in filtered if p.get("floor_no", "").lower() in [v.lower() for v in value]]
+            else:
+                filtered = [p for p in filtered if p.get("floor_no", "").lower() == value.lower()]
         
         elif filter_type == "min_rent" and value is not None:
             filtered = [p for p in filtered if p.get("rent_price", 0) >= value]
@@ -660,7 +688,7 @@ def main():
         
         # 4. Brokerage
         st.sidebar.markdown("4. **Brokerage**")
-        brokerage = st.sidebar.selectbox("Select", ["Any", "Yes", "No"], key="brokerage")
+        brokerage = st.sidebar.multiselect("Select", ["Yes", "No"], key="brokerage")
         
         # 5. Property ID
         st.sidebar.markdown("5. **Property ID**")
@@ -668,7 +696,7 @@ def main():
         
         # 6. Furnishing
         st.sidebar.markdown("6. **Furnishing**")
-        furnishing = st.sidebar.selectbox("Select", ["Any", "Furnished", "Unfurnished"], key="furnishing")
+        furnishing = st.sidebar.multiselect("Select", ["Furnished", "Unfurnished"], key="furnishing")
         
         # 7. Security Deposit
         st.sidebar.markdown("7. **Security Deposit**")
@@ -688,15 +716,15 @@ def main():
         
         # 9. Area
         st.sidebar.markdown("9. **Area**")
-        area = st.sidebar.selectbox("Select", ["Any"] + areas, key="area")
+        area = st.sidebar.multiselect("Select", areas, key="area")
         
         # 10. Zone
         st.sidebar.markdown("10. **Zone**")
-        zone = st.sidebar.selectbox("Select", ["Any"] + zones, key="zone")
+        zone = st.sidebar.multiselect("Select", zones, key="zone")
         
         # 11. Floor Number
         st.sidebar.markdown("11. **Floor Number**")
-        floor_no = st.sidebar.selectbox("Select", ["Any"] + floor_nos, key="floor_no")
+        floor_no = st.sidebar.multiselect("Select", floor_nos, key="floor_no")
         
         # 12. Total Floors
         st.sidebar.markdown("12. **Total Floors**")
@@ -708,19 +736,19 @@ def main():
         
         # 13. Property Type
         st.sidebar.markdown("13. **Property Type**")
-        property_type = st.sidebar.selectbox("Select", ["Any"] + property_types, key="property_type")
+        property_type = st.sidebar.multiselect("Select", property_types, key="property_type")
         
         # 14. Ownership
         st.sidebar.markdown("14. **Ownership**")
-        ownership = st.sidebar.selectbox("Select", ["Any"] + ownerships, key="ownership")
+        ownership = st.sidebar.multiselect("Select", ownerships, key="ownership")
         
         # 15. Possession Status
         st.sidebar.markdown("15. **Possession Status**")
-        possession_status = st.sidebar.selectbox("Select", ["Any"] + possession_statuses, key="possession_status")
+        possession_status = st.sidebar.multiselect("Select", possession_statuses, key="possession_status")
         
         # 16. Location Hub
         st.sidebar.markdown("16. **Location Hub**")
-        location_hub = st.sidebar.selectbox("Select", ["Any"] + location_hubs, key="location_hub")
+        location_hub = st.sidebar.multiselect("Select", location_hubs, key="location_hub")
         
         # 17. Facilities
         st.sidebar.markdown("17. **Facilities**")
@@ -766,16 +794,28 @@ def main():
                     filters["max_age"] = max_age
                 
                 # Brokerage filter
-                if brokerage != "Any":
-                    filters["brokerage"] = brokerage.lower()
+                if brokerage:
+                    # Handle multiple selections
+                    if len(brokerage) == 1:
+                        filters["brokerage"] = brokerage[0].lower()
+                    else:
+                        # For multiple selections, we need to handle it differently
+                        # We'll create a custom filter for this
+                        filters["brokerage_list"] = [b.lower() for b in brokerage]
                 
                 # Property ID filter
                 if property_id:
                     filters["property_id"] = property_id
                 
                 # Furnishing filter
-                if furnishing != "Any":
-                    filters["furnishing"] = furnishing.lower()
+                if furnishing:
+                    # Handle multiple selections
+                    if len(furnishing) == 1:
+                        filters["furnishing"] = furnishing[0].lower()
+                    else:
+                        # For multiple selections, we need to handle it differently
+                        # We'll create a custom filter for this
+                        filters["furnishing_list"] = [f.lower() for f in furnishing]
                 
                 # Security deposit filters
                 if min_deposit > 0:
@@ -790,15 +830,15 @@ def main():
                     filters["max_rent"] = max_rent
                 
                 # Area filter
-                if area != "Any":
+                if area:
                     filters["area"] = area
                 
                 # Zone filter
-                if zone != "Any":
+                if zone:
                     filters["zone"] = zone
                 
                 # Floor number filter
-                if floor_no != "Any":
+                if floor_no:
                     filters["floor_no"] = floor_no
                 
                 # Total floors filters
@@ -808,19 +848,19 @@ def main():
                     filters["max_total_floors"] = max_total_floors
                 
                 # Property type filter
-                if property_type != "Any":
+                if property_type:
                     filters["property_type"] = property_type
                 
                 # Ownership filter
-                if ownership != "Any":
+                if ownership:
                     filters["ownership"] = ownership
                 
                 # Possession status filter
-                if possession_status != "Any":
+                if possession_status:
                     filters["possession_status"] = possession_status
                 
                 # Location hub filter
-                if location_hub != "Any":
+                if location_hub:
                     filters["location_hub"] = location_hub
                 
                 # Facilities filter
