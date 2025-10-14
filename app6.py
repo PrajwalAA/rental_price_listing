@@ -196,68 +196,86 @@ else:
 
 # --- Map View ---
 # --- Map View ---
+# --- Map View ---
 st.markdown("### 🗺️ Map View")
 if not filtered_df.empty:
     # Check if Latitude & Longitude exist
     if "Latitude" in filtered_df.columns and "Longitude" in filtered_df.columns:
-        # Calculate map center only if coordinates are available
+        # Convert coordinates to numeric and handle missing values
+        filtered_df["Latitude"] = pd.to_numeric(filtered_df["Latitude"], errors="coerce")
+        filtered_df["Longitude"] = pd.to_numeric(filtered_df["Longitude"], errors="coerce")
+        
+        # Filter out rows with invalid coordinates
         valid_coords = filtered_df.dropna(subset=["Latitude", "Longitude"])
+        
         if not valid_coords.empty:
             map_center = [valid_coords["Latitude"].mean(), valid_coords["Longitude"].mean()]
         else:
             map_center = [21.1458, 79.0882]  # Default center
+            st.warning("No valid coordinates found. Using default location.")
     else:
         map_center = [21.1458, 79.0882]  # Default center
+        st.warning("Latitude and Longitude columns not found in data. Using default location.")
 
+    # Create map
     m = folium.Map(location=map_center, zoom_start=12)
     
     # Create feature groups for better organization
     above_avg_group = folium.FeatureGroup(name='Above Average Rent')
     below_avg_group = folium.FeatureGroup(name='Below Average Rent')
     
+    # Track markers added
+    markers_added = 0
+    
     for _, row in filtered_df.iterrows():
-        # Only add markers if coordinates are available
+        # Only add markers if coordinates are available and valid
         if "Latitude" in row and "Longitude" in row and pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
-            lat, lon = row["Latitude"], row["Longitude"]
-            
-            # Create detailed popup HTML
-            popup_html = f"""
-            <div style="font-family: Arial; max-width: 250px;">
-                <h4 style="margin-top: 0; color: #1e40af;">{row['PG Name']}</h4>
-                <p style="margin: 5px 0;"><b>Location:</b> {row['Area']}, {row['City']}</p>
-                <p style="margin: 5px 0;"><b>Shearing:</b> {row['Shearing']}</p>
-                <p style="margin: 5px 0;"><b>Rent:</b> ₹{row['Rent Price']}</p>
-                <p style="margin: 5px 0;"><b>Meals:</b> {row['Meals Available']}</p>
-                <p style="margin: 5px 0;"><b>Best For:</b> {row['Best Suit For']}</p>
-                <p style="margin: 5px 0;">
-                    <b>Security Deposit:</b> ₹{row['Security Deposit']}
-                </p>
-                <p style="margin: 5px 0;">
-                    <b>Amenities:</b> {', '.join(row['Amenities'][:5]) if row['Amenities'] else 'None'}
-                </p>
-            </div>
-            """
-            
-            # Create tooltip
-            tooltip_text = f"{row['PG Name']} - ₹{row['Rent Price']}"
-            
-            # Determine marker color and icon
-            if row['Rent Price'] > avg_rent:
-                color = 'red'
-                icon = 'fa-exclamation-circle'
-                group = above_avg_group
-            else:
-                color = 'blue'
-                icon = 'fa-check-circle'
-                group = below_avg_group
-            
-            # Create marker with custom icon
-            folium.Marker(
-                [lat, lon],
-                popup=folium.Popup(popup_html, max_width=300),
-                tooltip=tooltip_text,
-                icon=folium.Icon(color=color, icon=icon, prefix='fa')
-            ).add_to(group)
+            try:
+                lat = float(row["Latitude"])
+                lon = float(row["Longitude"])
+                
+                # Create detailed popup HTML
+                popup_html = f"""
+                <div style="font-family: Arial; max-width: 250px;">
+                    <h4 style="margin-top: 0; color: #1e40af;">{row['PG Name']}</h4>
+                    <p style="margin: 5px 0;"><b>Location:</b> {row['Area']}, {row['City']}</p>
+                    <p style="margin: 5px 0;"><b>Shearing:</b> {row['Shearing']}</p>
+                    <p style="margin: 5px 0;"><b>Rent:</b> ₹{row['Rent Price']}</p>
+                    <p style="margin: 5px 0;"><b>Meals:</b> {row['Meals Available']}</p>
+                    <p style="margin: 5px 0;"><b>Best For:</b> {row['Best Suit For']}</p>
+                    <p style="margin: 5px 0;">
+                        <b>Security Deposit:</b> ₹{row['Security Deposit']}
+                    </p>
+                    <p style="margin: 5px 0;">
+                        <b>Amenities:</b> {', '.join(row['Amenities'][:5]) if row['Amenities'] else 'None'}
+                    </p>
+                </div>
+                """
+                
+                # Create tooltip
+                tooltip_text = f"{row['PG Name']} - ₹{row['Rent Price']}"
+                
+                # Determine marker color and icon
+                if row['Rent Price'] > avg_rent:
+                    color = 'red'
+                    icon = 'fa-exclamation-circle'
+                    group = above_avg_group
+                else:
+                    color = 'blue'
+                    icon = 'fa-check-circle'
+                    group = below_avg_group
+                
+                # Create marker with custom icon
+                folium.Marker(
+                    location=[lat, lon],
+                    popup=folium.Popup(popup_html, max_width=300),
+                    tooltip=tooltip_text,
+                    icon=folium.Icon(color=color, icon=icon, prefix='fa')
+                ).add_to(group)
+                
+                markers_added += 1
+            except Exception as e:
+                st.warning(f"Error adding marker for {row['PG Name']}: {str(e)}")
     
     # Add feature groups to map
     above_avg_group.add_to(m)
@@ -290,7 +308,7 @@ if not filtered_df.empty:
             Below Average (₹{avg_rent:.2f})
         </p>
         <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
-            Total PGs: {len(filtered_df)}
+            Total PGs: {markers_added}
         </p>
     </div>'''
     m.get_root().html.add_child(Element(legend_html))
@@ -303,9 +321,14 @@ if not filtered_df.empty:
     
     # Display the map
     folium_static(m, width='100%', height=600)
+    
+    # Show debug information
+    if markers_added == 0:
+        st.error("No markers were added to the map. Please check your coordinate data.")
+    else:
+        st.success(f"Successfully added {markers_added} markers to the map.")
 else:
     st.warning("No PG listings to show on the map.")
-
 # --- Analytics Section ---
 st.markdown("### 📊 Analytics")
 
