@@ -194,6 +194,7 @@ else:
             """, unsafe_allow_html=True)
 
 # --- Map View ---
+# --- Map View ---
 st.markdown("### 🗺️ Map View")
 if not filtered_df.empty:
     # Check if Latitude & Longitude exist
@@ -209,37 +210,98 @@ if not filtered_df.empty:
 
     m = folium.Map(location=map_center, zoom_start=12)
     
+    # Create feature groups for better organization
+    above_avg_group = folium.FeatureGroup(name='Above Average Rent')
+    below_avg_group = folium.FeatureGroup(name='Below Average Rent')
+    
     for _, row in filtered_df.iterrows():
         # Only add markers if coordinates are available
         if "Latitude" in row and "Longitude" in row and pd.notna(row["Latitude"]) and pd.notna(row["Longitude"]):
             lat, lon = row["Latitude"], row["Longitude"]
-            color = 'red' if row['Rent Price'] > avg_rent else 'blue'
             
-            # Create tooltip with location info
-            tooltip_text = f"{row['PG Name']}<br>{row['Area']}, {row['City']}"
+            # Create detailed popup HTML
+            popup_html = f"""
+            <div style="font-family: Arial; max-width: 250px;">
+                <h4 style="margin-top: 0; color: #1e40af;">{row['PG Name']}</h4>
+                <p style="margin: 5px 0;"><b>Location:</b> {row['Area']}, {row['City']}</p>
+                <p style="margin: 5px 0;"><b>Shearing:</b> {row['Shearing']}</p>
+                <p style="margin: 5px 0;"><b>Rent:</b> ₹{row['Rent Price']}</p>
+                <p style="margin: 5px 0;"><b>Meals:</b> {row['Meals Available']}</p>
+                <p style="margin: 5px 0;"><b>Best For:</b> {row['Best Suit For']}</p>
+                <p style="margin: 5px 0;">
+                    <b>Security Deposit:</b> ₹{row['Security Deposit']}
+                </p>
+                <p style="margin: 5px 0;">
+                    <b>Amenities:</b> {', '.join(row['Amenities'][:5]) if row['Amenities'] else 'None'}
+                </p>
+            </div>
+            """
             
-            popup_html = f"<b>{row['PG Name']}</b><br>Rent: ₹{row['Rent Price']}<br>"
-            popup_html += "<span style='color:red;'>Above Average</span>" if row['Rent Price'] > avg_rent else "<span style='color:blue;'>Below Average</span>"
+            # Create tooltip
+            tooltip_text = f"{row['PG Name']} - ₹{row['Rent Price']}"
             
+            # Determine marker color and icon
+            if row['Rent Price'] > avg_rent:
+                color = 'red'
+                icon = 'fa-exclamation-circle'
+                group = above_avg_group
+            else:
+                color = 'blue'
+                icon = 'fa-check-circle'
+                group = below_avg_group
+            
+            # Create marker with custom icon
             folium.Marker(
                 [lat, lon],
-                popup=folium.Popup(popup_html, max_width=250),
+                popup=folium.Popup(popup_html, max_width=300),
                 tooltip=tooltip_text,
-                icon=folium.Icon(color=color, icon='home', prefix='fa')
-            ).add_to(m)
-
+                icon=folium.Icon(color=color, icon=icon, prefix='fa')
+            ).add_to(group)
+    
+    # Add feature groups to map
+    above_avg_group.add_to(m)
+    below_avg_group.add_to(m)
+    
+    # Add layer control
+    folium.LayerControl().add_to(m)
+    
     # Add legend
     legend_html = f'''
-         <div style="position: fixed; top: 10px; right: 10px; width: 180px; height: 110px; 
-                     border:2px solid grey; z-index:9999; font-size:14px; background-color:white; padding: 10px;">
-             <b>Rent Comparison</b> <br>
-             <i class="fa fa-circle" style="color:red"></i> Above Average <br>
-             <i class="fa fa-circle" style="color:blue"></i> Below Average <br>
-             Avg: ₹{avg_rent:.2f}
-         </div>'''
+    <div style="position: fixed; 
+                bottom: 50px; 
+                left: 50px; 
+                width: 200px; 
+                height: 140px; 
+                background-color:white;
+                border:2px solid grey;
+                z-index:9999; 
+                font-size:14px;
+                padding: 10px;
+                border-radius: 5px;
+                box-shadow: 0 0 15px rgba(0,0,0,0.2);">
+        <p style="margin: 0 0 10px 0; font-weight: bold;">Rent Legend</p>
+        <p style="margin: 5px 0;">
+            <i class="fa fa-exclamation-circle" style="color:red"></i> 
+            Above Average (₹{avg_rent:.2f})
+        </p>
+        <p style="margin: 5px 0;">
+            <i class="fa fa-check-circle" style="color:blue"></i> 
+            Below Average (₹{avg_rent:.2f})
+        </p>
+        <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">
+            Total PGs: {len(filtered_df)}
+        </p>
+    </div>'''
     m.get_root().html.add_child(Element(legend_html))
-
-    folium_static(m, width='100%', height=500)
+    
+    # Add fullscreen button
+    plugins.Fullscreen(position='topright').add_to(m)
+    
+    # Add measure control
+    plugins.MeasureControl(position='bottomright').add_to(m)
+    
+    # Display the map
+    folium_static(m, width='100%', height=600)
 else:
     st.warning("No PG listings to show on the map.")
 
