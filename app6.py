@@ -162,31 +162,43 @@ for idx, row in filtered_df.iterrows():
 # --- Map View ---
 st.markdown("### 🗺️ Map View")
 if not filtered_df.empty:
-    filtered_df["Latitude"] = 21.1458 + (pd.Series(range(len(filtered_df))) * 0.001 % 0.02)
-    filtered_df["Longitude"] = 79.0882 + (pd.Series(range(len(filtered_df))) * 0.001 % 0.02)
+    # If Latitude & Longitude exist in JSON
+    if "Latitude" in filtered_df.columns and "Longitude" in filtered_df.columns:
+        map_center = [filtered_df["Latitude"].mean(), filtered_df["Longitude"].mean()]
+    else:
+        # Fallback center
+        map_center = [21.1458, 79.0882]
+        # Optionally, use geocoding to get coordinates
 
-    m = folium.Map(location=[21.1458, 79.0882], zoom_start=12)
+    m = folium.Map(location=map_center, zoom_start=12)
+    
     for _, row in filtered_df.iterrows():
+        lat, lon = row.get("Latitude", map_center[0]), row.get("Longitude", map_center[1])
         color = 'red' if row['Rent Price'] > avg_rent else 'blue'
         popup_html = f"<b>{row['PG Name']}</b><br>Rent: ₹{row['Rent Price']}<br>"
         popup_html += "<span style='color:red;'>Above Average</span>" if row['Rent Price'] > avg_rent else "<span style='color:blue;'>Below Average</span>"
+        
         folium.Marker(
-            [row["Latitude"], row["Longitude"]],
+            [lat, lon],
             popup=folium.Popup(popup_html, max_width=250),
             tooltip=row["Area"],
-            icon=folium.Icon(color=color, icon='home')
+            icon=folium.Icon(color=color, icon='home', prefix='fa')
         ).add_to(m)
 
+    # Add legend
     legend_html = f'''
          <div style="position: fixed; top: 10px; right: 10px; width: 180px; height: 110px; 
-                     border:2px solid grey; z-index:9999; font-size:14px; background-color:white;">
-             &nbsp; <b>Rent Comparison</b> <br>
-             &nbsp; <i class="fa fa-circle" style="color:red"></i> Above Average <br>
-             &nbsp; <i class="fa fa-circle" style="color:blue"></i> Below Average <br>
-             &nbsp; Avg: ₹{avg_rent:.2f}
+                     border:2px solid grey; z-index:9999; font-size:14px; background-color:white; padding: 10px;">
+             <b>Rent Comparison</b> <br>
+             <i class="fa fa-circle" style="color:red"></i> Above Average <br>
+             <i class="fa fa-circle" style="color:blue"></i> Below Average <br>
+             Avg: ₹{avg_rent:.2f}
          </div>'''
     m.get_root().html.add_child(Element(legend_html))
-    folium_static(m, width=700, height=500)
+
+    folium_static(m, width='100%', height=500)
+else:
+    st.warning("No PG listings to show on the map.")
 
 # --- Analytics Section ---
 st.markdown("### 📊 Analytics")
