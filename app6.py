@@ -4,6 +4,7 @@ import pandas as pd
 import folium
 from streamlit_folium import folium_static
 import plotly.express as px
+import random
 from branca.element import Element
 
 # --- Load JSON data ---
@@ -12,11 +13,17 @@ with open("pg.json", "r") as f:
 
 df = pd.DataFrame(pg_data)
 
-# --- Fix Amenities and Common Area columns safely ---
-df["Amenities"] = df.get("Amenities", [[] for _ in range(len(df))])
-df["Amenities"] = df["Amenities"].apply(lambda x: x if isinstance(x, list) else [])
-df["Common Area"] = df.get("Common Area", [[] for _ in range(len(df))])
-df["Common Area"] = df["Common Area"].apply(lambda x: x if isinstance(x, list) else [])
+# --- Fix Amenities column safely ---
+if "Amenities" in df:
+    df["Amenities"] = df["Amenities"].apply(lambda x: x if isinstance(x, list) else [])
+else:
+    df["Amenities"] = [[] for _ in range(len(df))]
+
+if "Common Area" in df:
+    df["Common Area"] = df["Common Area"].apply(lambda x: x if isinstance(x, list) else [])
+else:
+    df["Common Area"] = [[] for _ in range(len(df))]
+
 
 # --- Page Configuration ---
 st.set_page_config(page_title="PG Finder Dashboard", layout="wide", initial_sidebar_state="expanded")
@@ -24,9 +31,29 @@ st.set_page_config(page_title="PG Finder Dashboard", layout="wide", initial_side
 # --- Custom CSS ---
 st.markdown("""
 <style>
-    .main-header { font-size: 2.5rem; color: #1E3A8A; text-align: center; margin-bottom: 1rem; padding: 1rem; background: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%); border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);}
-    .pg-card { background-color: #f8fafc; border-left: 5px solid #3b82f6; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05); transition: all 0.3s ease;}
-    .pg-card:hover { box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); transform: translateY(-2px);}
+    .main-header {
+        font-size: 2.5rem;
+        color: #1E3A8A;
+        text-align: center;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        background: linear-gradient(120deg, #a1c4fd 0%, #c2e9fb 100%);
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .pg-card {
+        background-color: #f8fafc;
+        border-left: 5px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        transition: all 0.3s ease;
+    }
+    .pg-card:hover {
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        transform: translateY(-2px);
+    }
     .pg-title { font-size: 1.4rem; font-weight: 600; color: #1e40af; margin-bottom: 0.5rem; }
     .pg-rent { font-size: 1.2rem; font-weight: 700; color: #047857; }
     .pg-details { margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed #cbd5e1; }
@@ -69,19 +96,23 @@ rent_max = st.sidebar.number_input("Max Rent", min_value=0, value=int(df["Rent P
 
 # --- Apply Filters ---
 filtered_df = df.copy()
+
 def filter_dropdown(df, column, value):
     if value != "Any":
         return df[df[column] == value]
     return df
 
-for col, val in [("Listing Title", listing_title), ("City", city), ("Area", area), 
-                 ("Zone", zone), ("PG Name", pg_name), ("Shearing", shearing), 
-                 ("Best Suit For", best_suit_for), ("Notice Period", notice_period), 
-                 ("Lock-in Period", lock_in_period)]:
-    filtered_df = filter_dropdown(filtered_df, col, val)
-
+filtered_df = filter_dropdown(filtered_df, "Listing Title", listing_title)
+filtered_df = filter_dropdown(filtered_df, "City", city)
+filtered_df = filter_dropdown(filtered_df, "Area", area)
+filtered_df = filter_dropdown(filtered_df, "Zone", zone)
+filtered_df = filter_dropdown(filtered_df, "PG Name", pg_name)
+filtered_df = filter_dropdown(filtered_df, "Shearing", shearing)
+filtered_df = filter_dropdown(filtered_df, "Best Suit For", best_suit_for)
 if meals != "Any":
     filtered_df = filtered_df[filtered_df["Meals Available"] == meals]
+filtered_df = filter_dropdown(filtered_df, "Notice Period", notice_period)
+filtered_df = filter_dropdown(filtered_df, "Lock-in Period", lock_in_period)
 if non_veg != "Any":
     filtered_df = filtered_df[filtered_df["Non-Veg Allowed"] == non_veg]
 if opposite_gender != "Any":
@@ -103,9 +134,10 @@ st.markdown(f"#### 💰 Average Rent: ₹{avg_rent:.2f}")
 
 # --- PG Listings ---
 st.markdown("### 📋 PG Listings")
+
 for idx, row in filtered_df.iterrows():
     rent_class = "avg-rent-highlight" if row['Rent Price'] > avg_rent else "below-avg-rent"
-    with st.expander(f"**{row['PG Name']}** - {row['Shearing']} | <span class='pg-rent {rent_class}'>₹{row['Rent Price']}</span>", expanded=False):
+    with st.expander(f"**{row['PG Name']}** - {row['Shearing']} | ₹{row['Rent Price']}", expanded=False):
         st.markdown(f"""
         <div class="pg-details">
             <div class="detail-row"><span class="detail-label">Listing Title:</span><span class="detail-value">{row['Listing Title']}</span></div>
@@ -120,8 +152,60 @@ for idx, row in filtered_df.iterrows():
             <div class="detail-row"><span class="detail-label">Drinking Allowed:</span><span class="detail-value">{row['Drinking Allowed']}</span></div>
             <div class="detail-row"><span class="detail-label">Smoking Allowed:</span><span class="detail-value">{row['Smoking Allowed']}</span></div>
             <div class="detail-row"><span class="detail-label">Security Deposit:</span><span class="detail-value">₹{row['Security Deposit']}</span></div>
+
+            <div style="margin-top: 1rem;">
+                <span class="detail-label">Amenities:</span>
+                <div class="amenities">
+                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Amenities', [])])}
+                </div>
+            </div>
+
+            <div style="margin-top: 1rem;">
+                <span class="detail-label">Common Areas:</span>
+                <div class="amenities">
+                    {"".join([f"<span class='amenity-tag'>{a}</span>" for a in row.get('Common Area', [])])}
+                </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+            </div>
         </div>
         """, unsafe_allow_html=True)
+
 
 # --- Map View ---
 st.markdown("### 🗺️ Map View")
@@ -130,33 +214,23 @@ if not filtered_df.empty:
     filtered_df["Longitude"] = 79.0882 + (pd.Series(range(len(filtered_df))) * 0.001 % 0.02)
 
     m = folium.Map(location=[21.1458, 79.0882], zoom_start=12)
-
-    # PG markers
     for _, row in filtered_df.iterrows():
         color = 'red' if row['Rent Price'] > avg_rent else 'blue'
         popup_html = f"<b>{row['PG Name']}</b><br>Rent: ₹{row['Rent Price']}<br>"
         popup_html += "<span style='color:red;'>Above Average</span>" if row['Rent Price'] > avg_rent else "<span style='color:blue;'>Below Average</span>"
-        folium.Marker([row["Latitude"], row["Longitude"]],
-                      popup=folium.Popup(popup_html, max_width=250),
-                      tooltip=row["Area"],
-                      icon=folium.Icon(color=color, icon='home')).add_to(m)
+        folium.Marker(
+            [row["Latitude"], row["Longitude"]],
+            popup=folium.Popup(popup_html, max_width=250),
+            tooltip=row["Area"],
+            icon=folium.Icon(color=color, icon='home')
+        ).add_to(m)
 
-    # --- Add your location ---
-    my_lat = 21.1450   # replace with your latitude
-    my_lon = 79.0800   # replace with your longitude
-    folium.Marker([my_lat, my_lon],
-                  popup=folium.Popup("<b>My Location</b>", max_width=200),
-                  tooltip="You are here",
-                  icon=folium.Icon(color='green', icon='user')).add_to(m)
-
-    # Legend
     legend_html = f'''
-         <div style="position: fixed; top: 10px; right: 10px; width: 180px; height: 140px; 
+         <div style="position: fixed; top: 10px; right: 10px; width: 180px; height: 110px; 
                      border:2px solid grey; z-index:9999; font-size:14px; background-color:white;">
              &nbsp; <b>Rent Comparison</b> <br>
              &nbsp; <i class="fa fa-circle" style="color:red"></i> Above Average <br>
              &nbsp; <i class="fa fa-circle" style="color:blue"></i> Below Average <br>
-             &nbsp; <i class="fa fa-circle" style="color:green"></i> Your Location <br>
              &nbsp; Avg: ₹{avg_rent:.2f}
          </div>'''
     m.get_root().html.add_child(Element(legend_html))
@@ -164,7 +238,9 @@ if not filtered_df.empty:
 
 # --- Analytics Section ---
 st.markdown("### 📊 Analytics")
+
 col1, col2 = st.columns(2)
+
 with col1:
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     if not filtered_df.empty:
@@ -186,6 +262,7 @@ with col2:
     st.markdown('</div>', unsafe_allow_html=True)
 
 col3, col4 = st.columns(2)
+
 with col3:
     st.markdown('<div class="chart-container">', unsafe_allow_html=True)
     if not filtered_df.empty:
@@ -212,4 +289,3 @@ st.markdown("""
     PG Finder Dashboard • Data sourced from pg.json • Last updated: 2023
 </div>
 """, unsafe_allow_html=True)
-
