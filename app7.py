@@ -20,6 +20,27 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialize session state variables
+def init_session_state():
+    """Initialize all session state variables"""
+    if 'residential_filters' not in st.session_state:
+        st.session_state.residential_filters = {}
+    if 'commercial_filters' not in st.session_state:
+        st.session_state.commercial_filters = {}
+    if 'user_location' not in st.session_state:
+        st.session_state.user_location = None
+    if 'filtered_residential_properties' not in st.session_state:
+        st.session_state.filtered_residential_properties = []
+    if 'filtered_commercial_properties' not in st.session_state:
+        st.session_state.filtered_commercial_properties = []
+    if 'apply_residential_filters' not in st.session_state:
+        st.session_state.apply_residential_filters = False
+    if 'apply_commercial_filters' not in st.session_state:
+        st.session_state.apply_commercial_filters = False
+
+# Initialize session state
+init_session_state()
+
 # --- Load residential properties from JSON file ---
 @st.cache_data
 def load_residential_properties():
@@ -922,25 +943,15 @@ def main():
     st.title("🏠 Property Search Assistant - Nagpur")
     st.markdown("Find your perfect property in Nagpur with our advanced search and comparison tools")
     
-    # Initialize session state for filters
-    if 'residential_filters' not in st.session_state:
-        st.session_state.residential_filters = {}
-    if 'commercial_filters' not in st.session_state:
-        st.session_state.commercial_filters = {}
-    
-    # Initialize session state for user location
-    if 'user_location' not in st.session_state:
-        st.session_state.user_location = None
-    
-    # Initialize session state for filtered properties
-    if 'filtered_residential_properties' not in st.session_state:
-        st.session_state.filtered_residential_properties = load_residential_properties()
-    if 'filtered_commercial_properties' not in st.session_state:
-        st.session_state.filtered_commercial_properties = load_commercial_properties()
-    
     # Load property data
     residential_properties_data = load_residential_properties()
     commercial_properties_data = load_commercial_properties()
+    
+    # Initialize filtered properties if empty
+    if not st.session_state.filtered_residential_properties:
+        st.session_state.filtered_residential_properties = residential_properties_data
+    if not st.session_state.filtered_commercial_properties:
+        st.session_state.filtered_commercial_properties = commercial_properties_data
     
     # Get unique values for residential properties
     residential_unique_values = get_residential_unique_values(residential_properties_data)
@@ -1060,7 +1071,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply Main Filters", type="primary"):
+                if st.button("🔍 Apply Filters", type="primary"):
                     st.session_state.apply_residential_filters = True
             with col2:
                 if st.button("🔄 Reset"):
@@ -1127,7 +1138,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply Sidebar Filters", type="primary"):
+                if st.button("🔍 Apply Filters", type="primary"):
                     st.session_state.apply_residential_filters = True
             with col2:
                 if st.button("🔄 Reset"):
@@ -1397,7 +1408,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply MAIN Filters", type="primary"):
+                if st.button("🔍 Apply Filters", type="primary"):
                     st.session_state.apply_commercial_filters = True
             with col2:
                 if st.button("🔄 Reset"):
@@ -1466,7 +1477,7 @@ def main():
             # Apply button
             col1, col2 = st.columns([1, 1])
             with col1:
-                if st.button("🔍 Apply SLIDEBAR Filters", type="primary"):
+                if st.button("🔍 Apply Filters", type="primary"):
                     # Build filters dictionary
                     filters = {}
                     
