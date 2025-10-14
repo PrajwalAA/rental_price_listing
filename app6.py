@@ -14,7 +14,7 @@ df = pd.DataFrame(pg_data)
 
 st.title("PG Listings Dashboard")
 
-# --- Sidebar Filters with Dropdowns ---
+# --- Sidebar Filters ---
 st.sidebar.header("Filter Options")
 
 listing_title = st.sidebar.selectbox("Listing Title", options=["Any"] + df["Listing Title"].unique().tolist())
@@ -67,6 +67,21 @@ filtered_df = filtered_df[filtered_df["Rent Price"] <= rent_max]
 
 st.subheader(f"Found {len(filtered_df)} PGs")
 
+# --- Listings First ---
+st.markdown("### Listings")
+for idx, row in filtered_df.iterrows():
+    st.markdown(f"**{row['PG Name']} ({row['Shearing']}) - ₹{row['Rent Price']}**")
+    st.markdown(f"- Listing Title: {row['Listing Title']}")
+    st.markdown(f"- Area: {row['Area']}, City: {row['City']}, Zone: {row['Zone']}")
+    st.markdown(f"- Best Suit For: {row['Best Suit For']}")
+    st.markdown(f"- Meals: {row['Meals Available']}, Notice: {row['Notice Period']}, Lock-in: {row['Lock-in Period']}")
+    st.markdown(f"- Non-Veg Allowed: {row['Non-Veg Allowed']}, Opposite Gender Allowed: {row['Opposite Gender Allowed']}")
+    st.markdown(f"- Visitors Allowed: {row['Visitors Allowed']}, Drinking Allowed: {row['Drinking Allowed']}, Smoking Allowed: {row['Smoking Allowed']}")
+    st.markdown(f"- Amenities: {', '.join(row.get('Amenities', []))}")
+    st.markdown(f"- Common Area: {', '.join(row.get('Common Area', []))}")
+    st.markdown(f"- Security Deposit: ₹{row['Security Deposit']}")
+    st.markdown("---")
+
 # --- Map View ---
 st.markdown("### Map View")
 filtered_df.loc[:, "Latitude"] = filtered_df.index.map(lambda x: 21.1458 + random.uniform(-0.01, 0.01))
@@ -97,18 +112,3 @@ if not filtered_df.empty:
     meals_count.columns = ["Meals", "Count"]
     fig3 = px.bar(meals_count, x="Meals", y="Count", title="Meals Availability")
     st.plotly_chart(fig3)
-
-# --- List Filtered PGs ---
-st.markdown("### Listings")
-for idx, row in filtered_df.iterrows():
-    st.markdown(f"**{row['PG Name']} ({row['Shearing']}) - ₹{row['Rent Price']}**")
-    st.markdown(f"- Listing Title: {row['Listing Title']}")
-    st.markdown(f"- Area: {row['Area']}, City: {row['City']}, Zone: {row['Zone']}")
-    st.markdown(f"- Best Suit For: {row['Best Suit For']}")
-    st.markdown(f"- Meals: {row['Meals Available']}, Notice: {row['Notice Period']}, Lock-in: {row['Lock-in Period']}")
-    st.markdown(f"- Non-Veg Allowed: {row['Non-Veg Allowed']}, Opposite Gender Allowed: {row['Opposite Gender Allowed']}")
-    st.markdown(f"- Visitors Allowed: {row['Visitors Allowed']}, Drinking Allowed: {row['Drinking Allowed']}, Smoking Allowed: {row['Smoking Allowed']}")
-    st.markdown(f"- Amenities: {', '.join(row.get('Amenities', []))}")
-    st.markdown(f"- Common Area: {', '.join(row.get('Common Area', []))}")
-    st.markdown(f"- Security Deposit: ₹{row['Security Deposit']}")
-    st.markdown("---")
