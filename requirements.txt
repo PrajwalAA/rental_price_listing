@@ -9,4 +9,5 @@ plotly
 folium
 streamlit_folium
 geopy
-opencv
+opencv-python
+opencv-contrib-python
